@@ -1,0 +1,5 @@
+/mvnw text eol=lf
+*.cmd text eol=crlf
+# Conserver les fins de ligne pour les fichiers binaires
+*.png binary
+*.jpg binary
