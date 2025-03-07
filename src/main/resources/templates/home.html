@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>Home</title>
+</head>
+<body>
+<h1>Bienvenue sur la page d'accueil</h1>
+<p>Voici quelques offres de billets :</p>
+<ul>
+  <li><a th:href="@{/offers/1}">Offre 1</a></li>
+  <li><a th:href="@{/offers/2}">Offre 2</a></li>
+  <!-- Ajoutez d'autres offres ici -->
+</ul>
+<p><a th:href="@{/login}">Se connecter</a></p>
+</body>
+</html>
