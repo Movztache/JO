@@ -1,15 +1,12 @@
 package com.example.jeuxolympiques.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Getter
-@Setter
+@Table(name = "user_app")
 public class UserApp {
 
     @Id
@@ -35,20 +32,25 @@ public class UserApp {
     @OneToMany(mappedBy = "userApp", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Reservation> reservations = new ArrayList<>();
 
-
     public String getEmail() {
         return email;
-    }
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public String getPassword() {
         return password;
     }
+
+    public void setRule(Rule rule) {
+        this.rule = rule;
+    }
+    public void setEmail(String email) {
+        this.email = email;
+    }
     public void setPassword(String password) {
         this.password = password;
     }
 
-
+    public void setUserKey(String userKey) {
+        this.userKey = userKey;
+    }
 }
