@@ -5,12 +5,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.Date;
+import java.util.UUID;
 
 @Entity
 @Getter
 @Setter
 public class Reservation {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,6 +20,7 @@ public class Reservation {
     private String finalKey;
     private Integer quantity;
 
+
     @ManyToOne
     @JoinColumn(name = "user_app_id",nullable = false)
     private UserApp userApp;
@@ -28,4 +29,8 @@ public class Reservation {
     @JoinColumn(name = "offer_id",nullable = false)
     private Offer offer;
 
+    @PrePersist
+    private void generateQrCode() {
+        this.qrCode = UUID.randomUUID().toString();
+    }
 }
