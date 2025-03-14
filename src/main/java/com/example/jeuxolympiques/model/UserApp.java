@@ -53,4 +53,8 @@ public class UserApp {
     public void setUserKey(String userKey) {
         this.userKey = userKey;
     }
+    public String getUserKey() {
+        return userKey;
+    }
+
 }
