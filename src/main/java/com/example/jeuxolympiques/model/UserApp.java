@@ -56,5 +56,29 @@ public class UserApp {
     public String getUserKey() {
         return userKey;
     }
+    public Long getId() {
+        return id;
+    }
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public String getLastName() {
+        return lastName;
+    }
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+    public String getFirstName() {
+        return firstName;
+    }
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+    public List<Cart> getCarts() {
+        return carts;
+    }
+    public List<Reservation> getReservations() {
+        return reservations;
+    }
 
 }
