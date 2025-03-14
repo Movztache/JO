@@ -4,26 +4,41 @@ import jakarta.persistence.*;
 
 import java.util.Date;
 import java.util.UUID;
+import jakarta.validation.constraints.*;
 
 @Entity
 public class Reservation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @NotNull()
+    @Temporal(TemporalType.TIMESTAMP)
     private Date reservationDate;
+
+    @NotBlank()
     private String reservationKey;
+
+    @NotBlank()
     private String qrCode;
+
     private String finalKey;
+
+    @NotNull()
+    @Min(value = 1, message = "La quantité doit être d'au moins 1")
+    @Max(value = 10000, message = "La quantité ne peut pas dépasser 10000")
     private Integer quantity;
 
-
     @ManyToOne
-    @JoinColumn(name = "user_app_id",nullable = false)
+    @JoinColumn(name = "user_app_id", nullable = false)
+    @NotNull()
     private UserApp userApp;
 
     @ManyToOne
-    @JoinColumn(name = "offer_id",nullable = false)
+    @JoinColumn(name = "offer_id", nullable = false)
+    @NotNull()
     private Offer offer;
+
 
     @PrePersist
     private void generateQrCode() {
