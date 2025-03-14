@@ -31,4 +31,6 @@ public class Cart {
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
     }
+    public UserApp getUserApp() {
+    return userApp;}
 }
