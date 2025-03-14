@@ -18,4 +18,17 @@ public class Cart {
     @ManyToOne
     @JoinColumn(name = "offer_id",nullable = false)
     private Offer offer;
+
+    public Long getId() {
+        return id;
+    }
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public Integer getQuantity() {
+        return quantity;
+    }
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
 }

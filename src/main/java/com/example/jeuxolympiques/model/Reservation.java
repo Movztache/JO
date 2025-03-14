@@ -29,4 +29,66 @@ public class Reservation {
     private void generateQrCode() {
         this.qrCode = UUID.randomUUID().toString();
     }
+
+    public Long getId() {
+        return id;
+    }
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public Date getReservationDate() {
+        return reservationDate;
+    }
+    public void setReservationDate(Date reservationDate) {
+        this.reservationDate = reservationDate;
+    }
+    public String getReservationKey() {
+        return reservationKey;
+    }
+    public void setReservationKey(String reservationKey) {
+        this.reservationKey = reservationKey;
+    }
+    public String getQrCode() {
+        return qrCode;
+    }
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
+    }
+    public String getFinalKey() {
+        return finalKey;
+    }
+    public void setFinalKey(String finalKey) {
+        this.finalKey = finalKey;
+    }
+    public Integer getQuantity() {
+        return quantity;
+    }
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
+    public UserApp getUserApp() {
+        return userApp;
+    }
+    public void setUserApp(UserApp userApp) {
+        this.userApp = userApp;
+    }
+    public Offer getOffer() {
+        return offer;
+    }
+    public void setOffer(Offer offer) {
+        this.offer = offer;
+    }
+    public void setFinalKey() {
+        this.finalKey = this.reservationKey + this.quantity;
+    }
+    public void setReservationKey() {
+        this.reservationKey = this.qrCode.substring(0, 8);
+    }
+    public void setQuantity() {
+        this.quantity = Integer.parseInt(this.qrCode.substring(8));
+    }
+    public void setReservationDate() {
+        this.reservationDate = new Date();
+    }
+
 }
