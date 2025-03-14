@@ -25,7 +25,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/home", "/offers/**").permitAll() // Pages accessibles à tous
+                        .requestMatchers("/", "/home", "/offers/**","/register").permitAll() // Pages accessibles à tous
                         .requestMatchers("/profile/**").authenticated() // Les URLs commençant par /profile/ nécessitent une authentification
                         .requestMatchers("/buy-ticket/**").authenticated() // Les URLs commençant par /buy-ticket/ nécessitent une authentification
                         .requestMatchers("/admin/**").hasRole("ADMIN") // Les URLs commençant par /admin/ nécessitent le rôle "ADMIN".

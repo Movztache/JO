@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "user_app")
@@ -15,18 +16,23 @@ public class UserApp {
 
     @NotBlank(message = "Le nom est obligatoire")
     @Size(max = 50, message = "Le nom ne doit pas dépasser 50 caractères")
+    @Column(name = "last_name")
     private String lastName;
 
     @NotBlank(message = "Le prénom est obligatoire")
     @Size(max = 50, message = "Le prénom ne doit pas dépasser 50 caractères")
+    @Column(name = "first_name")
     private String firstName;
 
     @NotBlank(message = "Le mot de passe est obligatoire")
+    @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")
+    @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=]).*$",
+            message = "Le mot de passe doit contenir au moins un chiffre, une minuscule, une majuscule et un caractère spécial")
     private String password;
 
     @NotBlank(message = "L'email est obligatoire")
     @Email(message = "Format d'email invalide")
-    @Column(unique = true) // Garantit l'unicité de l'email
+    @Column(unique = true)
     private String email;
 
     @Column(name = "user_key")
@@ -47,16 +53,16 @@ public class UserApp {
 
     // Constructeurs
     public UserApp() {
-
     }
 
     public UserApp(String firstName, String lastName, String email, String password) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
-        this.password = password;
+        this.password = password;  // Le mot de passe sera encodé par le service, pas ici
     }
 
+    // Getters et setters
     public String getEmail() {
         return email;
     }
@@ -154,25 +160,23 @@ public class UserApp {
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
-        // Vérifications que l'objet n'est pas null et est de la même classe
         if (obj == null || getClass() != obj.getClass()) return false;
         UserApp userApp = (UserApp) obj;
-        return id != null && id.equals(userApp.getId());
+        return Objects.equals(id, userApp.id);
     }
 
     @Override
     public int hashCode() {
-        // Si l'id n'est pas null, on utilise son hashCode, sinon on retourne 0.
-        return id != null ? id.hashCode() : 0;
+        return Objects.hash(id);
     }
 
     @Override
     public String toString() {
-        return "MyUser {" +
+        return "UserApp{" +
                 "id=" + id +
                 ", firstName='" + firstName + '\'' +
                 ", lastName='" + lastName + '\'' +
                 ", email='" + email + '\'' +
-                ", rule=" + (rule != null ? rule.getClass().getSimpleName() + "@" + Integer.toHexString(rule.hashCode()) : "null") + "}";
+                '}';
     }
 }
