@@ -1,63 +1,47 @@
 package com.example.jeuxolympiques.service;
 
-import com.example.jeuxolympiques.model.Rule;
-import com.example.jeuxolympiques.repository.RuleRepository;
+import com.example.jeuxolympiques.dto.UserRegistrationDTO;
+import com.example.jeuxolympiques.model.UserApp;
+import com.example.jeuxolympiques.repository.UserAppRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.example.jeuxolympiques.model.UserApp;
-import com.example.jeuxolympiques.repository.UserAppRepository;
 
-import java.util.UUID;
+import jakarta.validation.Valid;
 
+/**
+ * Service qui gère les opérations liées aux utilisateurs
+ */
 @Service
-
 public class UserService {
 
-    private final UserAppRepository userAppRepository;
+    private final UserAppRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RuleRepository ruleRepository;
 
     @Autowired
-    public UserService(UserAppRepository userAppRepository, PasswordEncoder passwordEncoder, RuleRepository ruleRepository) {
-        this.userAppRepository = userAppRepository;
+    public UserService(UserAppRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.ruleRepository = ruleRepository;
     }
 
-//    public void createUser(UserApp userApp) {
-//        // Rechercher la règle "User" dans le contexte
-//        Rule rule = ruleRepository.findByName("User");
-//        if (rule != null) {
-//            // Utiliser la règle pour attribuer des droits à l'utilisateur
-//            UserApp.setRule((Rule) Collections.singletonList(rule));
-//            // Créer une clé d'user avec UUID
-//            String userKey = UUID.randomUUID().toString();
-//            String hashedPassword = passwordEncoder.encode(userApp.getPassword());
-//            userApp.setPassword(hashedPassword);
-//            // Ajouter l'utilisateur au repository UserAppRepository
-//            userAppRepository.save(userApp);
-//
-//        }
-//    }
-public void createUser(UserApp userApp) {
-    // Rechercher la règle "User" dans le contexte
-    Rule rule = ruleRepository.findByName("User");
-    if (rule != null) {
-        // Utiliser la règle pour attribuer des droits à l'utilisateur
-        userApp.setRule(rule);
+    /**
+     * Enregistre un nouvel utilisateur à partir du DTO d'inscription
+     * @param dto Les données d'inscription validées
+     * @return L'entité utilisateur créée et sauvegardée
+     */
+    public UserApp registerNewUser(@Valid UserRegistrationDTO dto) {
+        // Vérifie si les mots de passe correspondent
+        if (!dto.passwordsMatch()) {
+            throw new IllegalArgumentException("Les mots de passe ne correspondent pas");
+        }
 
-        // Créer une clé d'user avec UUID
-        String userKey = UUID.randomUUID().toString();
-        userApp.setUserKey(userKey);
+        // Vérifie si l'email est déjà utilisé
+        if (userRepository.findByEmail(dto.getEmail()) != null) {
+            throw new IllegalArgumentException("Cet email est déjà utilisé");
+        }
 
-        String hashedPassword = passwordEncoder.encode(userApp.getPassword());
-        userApp.setPassword(hashedPassword);
-
-        // Ajouter l'utilisateur au repository UserAppRepository
-        userAppRepository.save(userApp);
+        // Convertit le DTO en entité et sauvegarde
+        UserApp user = dto.toEntity(passwordEncoder);
+        return userRepository.save(user);
     }
-}
-
-
 }
