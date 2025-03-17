@@ -10,7 +10,7 @@ public class Log {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long logId;
 
     @ManyToOne
     @JoinColumn(name = "user_app_id", nullable = false)
@@ -24,11 +24,11 @@ public class Log {
     private LocalDateTime timestamp;
 
 
-    public Long getId() {
-        return id;
+    public Long getLogId() {
+        return logId;
     }
-    public void setId(Long id) {
-        this.id = id;
+    public void setLogId(Long id) {
+        this.logId = id;
     }
     public String getAction() {
         return action;

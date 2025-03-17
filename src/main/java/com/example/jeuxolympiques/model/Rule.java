@@ -14,7 +14,7 @@ public class Rule {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long ruleId;
 
     @NotBlank(message = "Le nom du rôle est obligatoire")
     private String name;
@@ -23,11 +23,11 @@ public class Rule {
     private List<UserApp> userApps = new ArrayList<>();
 
 
-    public Long getId() {
-        return id;
+    public Long getRuleId() {
+        return ruleId;
     }
-    public void setId(Long id) {
-        this.id = id;
+    public void setRuleId(Long id) {
+        this.ruleId = id;
     }
     public void setName(String name) {
         this.name = name;

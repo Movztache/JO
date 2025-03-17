@@ -12,7 +12,7 @@ public class UserApp {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long userId;
 
     @NotBlank(message = "Le nom est obligatoire")
     @Size(max = 50, message = "Le nom ne doit pas dépasser 50 caractères")
@@ -95,12 +95,12 @@ public class UserApp {
         return userKey;
     }
 
-    public Long getId() {
-        return id;
+    public Long getUserId() {
+        return userId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setUserId(Long id) {
+        this.userId = id;
     }
 
     public String getLastName() {
@@ -162,18 +162,18 @@ public class UserApp {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         UserApp userApp = (UserApp) obj;
-        return Objects.equals(id, userApp.id);
+        return Objects.equals(userId, userApp.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return Objects.hash(userId);
     }
 
     @Override
     public String toString() {
         return "UserApp{" +
-                "id=" + id +
+                "id=" + userId +
                 ", firstName='" + firstName + '\'' +
                 ", lastName='" + lastName + '\'' +
                 ", email='" + email + '\'' +

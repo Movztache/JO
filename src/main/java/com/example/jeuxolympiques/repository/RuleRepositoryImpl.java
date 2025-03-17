@@ -1,7 +1,9 @@
 package com.example.jeuxolympiques.repository;
 
-import com.example.jeuxolympiques.repository.RuleRepository;
 
+import org.springframework.stereotype.Repository;
+
+@Repository
 public interface RuleRepositoryImpl extends RuleRepository {
 
 

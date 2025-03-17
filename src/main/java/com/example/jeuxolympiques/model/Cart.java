@@ -8,7 +8,7 @@ public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long cartId;
 
     @NotNull(message = "La quantité est obligatoire")
     @Min(value = 1, message = "La quantité doit être d'au moins 1")
@@ -25,11 +25,11 @@ public class Cart {
     private Offer offer;
 
 
-    public Long getId() {
-        return id;
+    public Long getCartId() {
+        return cartId;
     }
-    public void setId(Long id) {
-        this.id = id;
+    public void setCartId(Long id) {
+        this.cartId = id;
     }
     public Integer getQuantity() {
         return quantity;

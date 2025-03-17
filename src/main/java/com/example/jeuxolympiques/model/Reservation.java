@@ -10,7 +10,7 @@ import jakarta.validation.constraints.*;
 public class Reservation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long reservationId;
 
     @NotNull()
     @Temporal(TemporalType.TIMESTAMP)
@@ -45,11 +45,11 @@ public class Reservation {
         this.qrCode = UUID.randomUUID().toString();
     }
 
-    public Long getId() {
-        return id;
+    public Long getReservationId() {
+        return reservationId;
     }
-    public void setId(Long id) {
-        this.id = id;
+    public void setReservationId(Long id) {
+        this.reservationId = id;
     }
     public Date getReservationDate() {
         return reservationDate;
