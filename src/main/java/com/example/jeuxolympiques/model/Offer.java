@@ -3,11 +3,12 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
 @Entity
+@Table(name = "offer")
 public class Offer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long offerId;
 
     @NotBlank(message = "Le nom est obligatoire")
     @Size(max = 100, message = "Le nom ne doit pas dépasser 100 caractères")
@@ -24,12 +25,18 @@ public class Offer {
     @Size(max = 50, message = "Le type d'offre ne doit pas dépasser 50 caractères")
     private String offerType;
 
+    @Min(value = 1)
+    @Column(name = "person_count", nullable = false)
+    private Integer personCount;
 
-    public void setId(Long id) {
-        this.id = id;
+    @Column(nullable = false)
+    private boolean available = true;
+
+    public void setOfferId(Long id) {
+        this.offerId = id;
     }
-    public Long getId() {
-        return id;
+    public Long getOfferId() {
+        return offerId;
     }
     public String getName() {
         return name;
@@ -61,6 +68,30 @@ public class Offer {
 
     public void setOfferType(String offerType) {
         this.offerType = offerType;
+    }
+
+    public boolean getIsAvailable() {
+        return available;
+    }
+    public void setIsAvailable(boolean available) {
+        this.available = available;
+    }
+    public Integer getPersonCount() {
+        return personCount;
+    }
+    public void setPersonCount(Integer personCount) {
+        this.personCount = personCount;
+    }
+
+    public Offer() {
+
+    }
+    public Offer(String name, String description, Double price, String offerType, Integer personCount) {
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.offerType = offerType;
+        this.personCount = personCount;
     }
 
 }
