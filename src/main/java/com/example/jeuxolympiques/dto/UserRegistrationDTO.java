@@ -96,7 +96,6 @@ public class UserRegistrationDTO {
         user.setLastName(this.lastName);
         user.setEmail(this.email);
         user.setPassword(passwordEncoder.encode(this.password));
-        user.setUserKey(UUID.randomUUID().toString());
         return user;
     }
 }
