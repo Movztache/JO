@@ -43,4 +43,13 @@ public class Cart {
     public void setUserApp(UserApp userApp) {
         this.userApp = userApp;
     }
+
+    public Offer getOffer() {
+        return offer;
+    }
+
+    public void setOffer(Offer offer) {
+        this.offer = offer;
+    }
+
 }
