@@ -22,7 +22,12 @@ public class Reservation {
     @NotBlank()
     private String qrCode;
 
+    @Column(unique = true)
     private String finalKey;
+
+    private boolean isUsed;
+
+    private Date usageDate;
 
     @NotNull()
     @Min(value = 1, message = "La quantité doit être d'au moins 1")
@@ -104,6 +109,19 @@ public class Reservation {
     }
     public void setReservationDate() {
         this.reservationDate = new Date();
+    }
+
+    public boolean getIsUsed() {
+        return isUsed;
+    }
+    public void setIsUsed(boolean used) {
+        isUsed = used;
+    }
+    public Date getUsageDate() {
+        return usageDate;
+    }
+    public void setUsageDate(Date usageDate) {
+        this.usageDate = usageDate;
     }
 
 }

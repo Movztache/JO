@@ -4,12 +4,13 @@ package com.example.jeuxolympiques.configuration;
 import com.example.jeuxolympiques.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
 @Configuration
 @EnableWebSecurity
@@ -17,20 +18,26 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
 
+    // Permettre l'injection optionnelle (méthode recommandée)
     public SecurityConfig(CustomUserDetailsService customUserDetailsService) {
         this.customUserDetailsService = customUserDetailsService;
     }
+
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/home", "/offers/**","/register").permitAll() // Pages accessibles à tous
-                        .requestMatchers("/profile/**").authenticated() // Les URLs commençant par /profile/ nécessitent une authentification
-                        .requestMatchers("/buy-ticket/**").authenticated() // Les URLs commençant par /buy-ticket/ nécessitent une authentification
-                        .requestMatchers("/admin/**").hasRole("ADMIN") // Les URLs commençant par /admin/ nécessitent le rôle "ADMIN".
-                        .anyRequest().permitAll() // Toutes les autres requêtes sont permises sans authentification
+                        .requestMatchers("/", "/home", "/offers/**","/register").permitAll()
+                        .requestMatchers("/profile/**").authenticated()
+                        .requestMatchers("/buy-ticket/**").authenticated()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().permitAll()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                )
+
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll()
@@ -40,14 +47,10 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .permitAll()
                         .logoutSuccessUrl("/")
-                );
+                )
+                .userDetailsService(customUserDetailsService);
 
         return http.build();
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return customUserDetailsService;
     }
 
     @Bean
