@@ -54,7 +54,7 @@ public class CustomUserDetailsServiceTest {
 
         Collection<? extends GrantedAuthority> authorities = userDetails.getAuthorities();
         assertThat(authorities).hasSize(1);
-        assertThat(authorities).extracting("authority").containsExactly("User");
+        assertThat(authorities).extracting("authority").containsExactly("ROLE_USER");
 
         verify(userRepository).findByEmail("test@example.com");
     }

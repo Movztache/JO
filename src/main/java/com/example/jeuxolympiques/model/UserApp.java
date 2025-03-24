@@ -91,9 +91,7 @@ public class UserApp {
         this.userKey = userKey;
     }
 
-    public String getUserKey() {
-        return userKey;
-    }
+    public String getUserKey() {return userKey;}
 
     public Long getUserId() {
         return userId;
@@ -179,4 +177,5 @@ public class UserApp {
                 ", email='" + email + '\'' +
                 '}';
     }
+
 }

@@ -28,8 +28,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User not found");
         }
         // Assigner le rôle par défaut "UTILISATEUR"
-        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(),
-                Collections.singletonList(new SimpleGrantedAuthority("User")));
+        return new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
     }
 
 }

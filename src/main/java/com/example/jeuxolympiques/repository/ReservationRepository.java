@@ -15,6 +15,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @NonNull
     Optional<Reservation> findById(@NonNull Long id);
 
-    List<Reservation> findByUserApp_UserId(Long userAppId);
+    Optional<Reservation> findByFinalKey(String finalKey);
+
 
 }
