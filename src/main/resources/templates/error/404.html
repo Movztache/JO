@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Page Non Trouvée</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body>
+<div class="error-container">
+  <div class="error-code">404</div>
+  <h1>Page Non Trouvée</h1>
+  <p>Nous sommes désolés, mais la page que vous recherchez n'existe pas.</p>
+  <p>Peut-être avez-vous mal saisi l'adresse ou la page a été déplacée.</p>
+  <div class="error-actions">
+    <a th:href="@{/}" class="btn btn-primary">Retour à l'accueil</a>
+  </div>
+</div>
+</body>
+</html>
