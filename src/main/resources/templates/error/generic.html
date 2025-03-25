@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Erreur</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body>
+<div class="error-container">
+  <div class="error-code" th:text="${status ?: 'Erreur'}">Erreur</div>
+  <h1 th:text="${error ?: 'Une erreur s''est produite'}">Une erreur s'est produite.</h1>
+  <p>Nous sommes désolés, mais quelque chose s'est mal passé.</p>
+  <p>Veuillez réessayer plus tard ou contacter le support si le problème persiste.</p>
+  <div class="error-actions">
+    <a th:href="@{/}" class="btn btn-primary">Retour à l'accueil</a>
+  </div>
+</div>
+</body>
+</html>

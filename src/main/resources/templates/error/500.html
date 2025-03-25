@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Erreur Serveur</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body>
+<div class="error-container">
+  <div class="error-code">500</div>
+  <h1>Erreur Interne du Serveur</h1>
+  <p>Nous sommes désolés, mais une erreur s'est produite sur notre serveur.</p>
+  <p>Notre équipe technique a été informée du problème et travaille à le résoudre.</p>
+  <div class="error-actions">
+    <a th:href="@{/}" class="btn btn-primary">Retour à l'accueil</a>
+  </div>
+</div>
+</body>
+</html>
