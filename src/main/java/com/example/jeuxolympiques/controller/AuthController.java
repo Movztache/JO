@@ -3,9 +3,12 @@ package com.example.jeuxolympiques.controller;
 import com.example.jeuxolympiques.dto.JwtResponse;
 import com.example.jeuxolympiques.dto.LoginRequest;
 import com.example.jeuxolympiques.dto.UserRegistrationDTO;
+import com.example.jeuxolympiques.model.Rule;
 import com.example.jeuxolympiques.model.UserApp;
+import com.example.jeuxolympiques.repository.RuleRepository;
 import com.example.jeuxolympiques.repository.UserAppRepository;
 import com.example.jeuxolympiques.security.JwtUtils;
+import com.example.jeuxolympiques.service.UserAppService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +20,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Contrôleur REST pour gérer l'authentification des utilisateurs
@@ -36,6 +37,8 @@ public class AuthController {
     private final UserAppRepository userRepository;  // Pour les opérations de base de données sur les utilisateurs
     private final PasswordEncoder passwordEncoder;  // Pour encoder les mots de passe
     private final JwtUtils jwtUtils;  // Pour générer et valider les tokens JWT
+    private final UserAppService userAppService;
+    private final RuleRepository ruleRepository;
 
     /**
      * Constructeur pour l'injection de dépendances
@@ -45,11 +48,15 @@ public class AuthController {
             AuthenticationManager authenticationManager,
             UserAppRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtUtils jwtUtils) {
+            JwtUtils jwtUtils,
+            UserAppService userAppService,
+            RuleRepository ruleRepository) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
+        this.userAppService = userAppService;
+        this.ruleRepository = ruleRepository;
     }
 
     /**
@@ -82,7 +89,7 @@ public class AuthController {
                 jwt,
                 user.getUserId(),
                 user.getEmail(),
-                user.getRule() != null ? user.getRule().getName() : "ROLE_USER"));
+                user.getRule() != null ? user.getRule().getName() : "User"));
     }
 
     /**
@@ -107,29 +114,45 @@ public class AuthController {
                     .body(Map.of("message", "Cet email est déjà utilisé"));
         }
 
-        // Créer un nouvel utilisateur à partir du DTO
-        // La méthode toEntity s'occupe de convertir le DTO en entité UserApp
-        // et d'encoder le mot de passe
-        UserApp user = registrationDto.toEntity(passwordEncoder);
+        // Création d'un nouvel utilisateur à partir du DTO
+        UserApp newUser = new UserApp();
+        newUser.setFirstName(registrationDto.getFirstName());
+        newUser.setLastName(registrationDto.getLastName());
+        newUser.setEmail(registrationDto.getEmail());
+        newUser.setPassword(passwordEncoder.encode(registrationDto.getPassword()));
+        // Génération de la clé unique
+        String userKey = userAppService.generateUniqueUserKey();
+        newUser.setUserKey(userKey);
 
-        // Enregistrer l'utilisateur dans la base de données
-        userRepository.save(user);
+        // Attribution du rôle USER
+        Rule userRule = ruleRepository.findByName("User");
+
+        // Vérifier si le rôle existe
+        if (userRule == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Erreur: Le rôle USER n'est pas trouvé dans le système."));
+        }
+
+        // Assigner le rôle directement à l'utilisateur
+        newUser.setRule(userRule);
+
+        // Enregistrement de l'utilisateur
+        userRepository.save(newUser);
 
         // Retourner une réponse avec code 201 (CREATED)
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("message", "Utilisateur enregistré avec succès"));
     }
 
-    @GetMapping("/test")
-    public ResponseEntity<?> test() {
-        // Création d'un simple objet Map qui sera converti en JSON
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "API fonctionne");
-        response.put("timestamp", new Date().getTime());
-        response.put("status", "success");
-
-        return ResponseEntity.ok(response);
-    }
+//    @GetMapping("/test")
+//    public ResponseEntity<?> test() {
+//        // Création d'un simple objet Map qui sera converti en JSON
+//        Map<String, Object> response = new HashMap<>();
+//        response.put("message", "API fonctionne");
+//        response.put("timestamp", new Date().getTime());
+//        response.put("status", "success");
+//
+//        return ResponseEntity.ok(response);
+//    }
 
 
 }
