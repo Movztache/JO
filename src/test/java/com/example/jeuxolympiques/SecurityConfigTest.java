@@ -43,13 +43,13 @@ public class SecurityConfigTest {
                     return new org.springframework.security.core.userdetails.User(
                             "admin@test.com",
                             "password",
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                            Collections.singletonList(new SimpleGrantedAuthority("Admin"))
                     );
                 } else {
                     return new org.springframework.security.core.userdetails.User(
                             username,
                             "password",
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                            Collections.singletonList(new SimpleGrantedAuthority("User"))
                     );
                 }
             };
