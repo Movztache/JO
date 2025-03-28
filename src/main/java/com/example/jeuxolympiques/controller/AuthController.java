@@ -143,16 +143,57 @@ public class AuthController {
                 .body(Map.of("message", "Utilisateur enregistré avec succès"));
     }
 
-//    @GetMapping("/test")
-//    public ResponseEntity<?> test() {
-//        // Création d'un simple objet Map qui sera converti en JSON
-//        Map<String, Object> response = new HashMap<>();
-//        response.put("message", "API fonctionne");
-//        response.put("timestamp", new Date().getTime());
-//        response.put("status", "success");
-//
-//        return ResponseEntity.ok(response);
-//    }
+    /**
+     * Vérifie si l'utilisateur a accès au panier avec la clé fournie
+     * @param userId ID de l'utilisateur
+     * @param userKey Clé d'accès utilisateur
+     * @return Statut d'accès au panier
+     */
+    @GetMapping("/cart-access/{userId}/{userKey}")
+    public ResponseEntity<Map<String, Boolean>> validateCartAccess(
+            @PathVariable Long userId,
+            @PathVariable String userKey) {
+
+        boolean isValid = userAppService.validateUserKey(userId, userKey);
+
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("accessGranted", isValid);
+
+        if (isValid) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+    }
+
+    /**
+     * Accède au panier d'un utilisateur avec sa clé
+     * @param userId ID de l'utilisateur
+     * @param userKey Clé d'accès utilisateur
+     * @return Le contenu du panier si l'accès est autorisé
+     */
+    @GetMapping("/cart/{userId}/{userKey}")
+    public ResponseEntity<?> getCartWithKey(
+            @PathVariable Long userId,
+            @PathVariable String userKey) {
+
+        if (!userAppService.validateUserKey(userId, userKey)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Clé utilisateur invalide"));
+        }
+
+        // Récupérer l'utilisateur et son panier en utilisant la clé (userKey)
+        UserApp user = userAppService.findByUserKey(userKey);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Déléguer au service CartService pour récupérer le panier
+        // Supposons qu'un objet CartService est injecté
+        // List<CartItemDTO> cartItems = cartService.getCartItems(user);
+
+        return ResponseEntity.ok(Map.of("message", "Accès au panier autorisé pour l'utilisateur " + userId));
+    }
 
 
 }

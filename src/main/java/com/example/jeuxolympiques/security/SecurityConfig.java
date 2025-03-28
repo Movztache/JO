@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers("/profile/**").authenticated()
                         .requestMatchers("/buy-ticket/**").authenticated()
                         .requestMatchers("/api/reservations/**").authenticated()
+                        .requestMatchers("/api/tickets/**").authenticated()
+                        .requestMatchers("/api/cart/**").authenticated()
                         // Routes nécessitant un rôle spécifique
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         // Configuration par défaut pour les autres routes
