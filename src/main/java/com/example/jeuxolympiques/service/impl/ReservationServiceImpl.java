@@ -89,13 +89,12 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setUserApp(userApp);
         reservation.setOffer(offer);
         reservation.setQuantity(quantity);
-        reservation.setQrCode(UUID.randomUUID().toString());
         reservation.setReservationDate(new Date());
-        reservation.setReservationKey();
 
-        // Génération de la clé finale sécurisée
-        String finalKey = generateFinalKey(providedUserKey, reservation.getReservationKey(), quantity);
-        reservation.setFinalKey(finalKey);
+        // Utilisation des nouvelles méthodes pour générer les clés automatiquement
+        reservation.setReservationKey(); // Génère une clé de réservation aléatoire
+        reservation.generateSecureQrCode(); // Génère le QR Code sécurisé avec le format requis
+        reservation.setFinalKey(); // Génère la clé finale automatiquement
         reservation.setIsUsed(false);
 
         // Calculer le montant total à payer
