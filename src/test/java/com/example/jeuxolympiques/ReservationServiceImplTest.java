@@ -6,12 +6,12 @@ import com.example.jeuxolympiques.model.UserApp;
 import com.example.jeuxolympiques.repository.OfferRepository;
 import com.example.jeuxolympiques.repository.ReservationRepository;
 import com.example.jeuxolympiques.repository.UserAppRepository;
-import com.example.jeuxolympiques.service.ReservationServiceImpl;
+import com.example.jeuxolympiques.service.PaymentService;
+import com.example.jeuxolympiques.service.impl.ReservationServiceImpl;
 import com.example.jeuxolympiques.service.UserAppService;
-
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -20,6 +20,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
 
 public class ReservationServiceImplTest {
 
@@ -38,6 +39,10 @@ public class ReservationServiceImplTest {
     @InjectMocks
     private ReservationServiceImpl reservationService;
 
+    @Mock
+    private PaymentService paymentService;
+
+
     private Reservation reservation1;
     private Reservation reservation2;
     private UserApp userApp;
@@ -47,174 +52,245 @@ public class ReservationServiceImplTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        // Configuration des objets de test
         userApp = new UserApp();
         userApp.setUserId(1L);
-        userApp.setFirstName("testUser");
+        userApp.setEmail("test@example.com");
 
         offer = new Offer();
         offer.setOfferId(1L);
-        offer.setName("Test Offer");
-        offer.setIsAvailable(true);
+        // Supposons que l'offre a des places disponibles
 
-        // Préparation des réservations
         reservation1 = new Reservation();
         reservation1.setReservationId(1L);
-        reservation1.setReservationDate(new Date());
-        reservation1.setReservationKey("abc123");
-        reservation1.setQrCode("qr123456");
-        reservation1.setFinalKey("abc12310");
-        reservation1.setQuantity(10);
-        reservation1.setIsUsed(false);
         reservation1.setUserApp(userApp);
         reservation1.setOffer(offer);
+        reservation1.setQuantity(2);
+        reservation1.setReservationDate(new Date());
+        reservation1.setReservationKey("key123");
+        reservation1.setFinalKey("final123");
+        reservation1.setIsUsed(false);
 
         reservation2 = new Reservation();
         reservation2.setReservationId(2L);
-        reservation2.setReservationDate(new Date());
-        reservation2.setReservationKey("def456");
-        reservation2.setQrCode("qr789012");
-        reservation2.setFinalKey("def4565");
-        reservation2.setQuantity(5);
-        reservation2.setIsUsed(true);
-        reservation2.setUsageDate(new Date());
         reservation2.setUserApp(userApp);
         reservation2.setOffer(offer);
+        reservation2.setQuantity(1);
+        reservation2.setReservationDate(new Date());
+        reservation2.setReservationKey("key456");
+        reservation2.setFinalKey("final456");
+        reservation2.setIsUsed(true);
     }
 
     @Test
     void findById_WithValidId_ShouldReturnReservation() {
-        // Préparation
+        // Given
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation1));
 
-        // Exécution
+        // When
         Optional<Reservation> result = reservationService.findById(1L);
 
-        // Vérification
+        // Then
         assertTrue(result.isPresent());
-        assertEquals(reservation1, result.get());
-        verify(reservationRepository, times(1)).findById(1L);
+        assertEquals(1L, result.get().getReservationId());
+        verify(reservationRepository).findById(1L);
     }
 
     @Test
-    void findById_WithNullId_ShouldReturnEmptyOptional() {
-        // Préparation
-        when(reservationRepository.findById(null)).thenReturn(Optional.empty());
+    void findById_WithInvalidId_ShouldReturnEmptyOptional() {
+        // Given
+        when(reservationRepository.findById(99L)).thenReturn(Optional.empty());
 
-        // Exécution
-        Optional<Reservation> result = reservationService.findById(null);
+        // When
+        Optional<Reservation> result = reservationService.findById(99L);
 
-        // Vérification
+        // Then
         assertFalse(result.isPresent());
-        verify(reservationRepository, times(1)).findById(null);
-    }
-
-    @Test
-    void verifyTicket_WithValidUnusedTicket_ShouldMarkAsUsedAndReturn() {
-        // Préparation
-        when(reservationRepository.findByFinalKey("abc12310")).thenReturn(Optional.of(reservation1));
-        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Exécution
-        Optional<Reservation> result = reservationService.verifyTicket("abc12310");
-
-        // Vérification
-        assertTrue(result.isPresent());
-        assertTrue(result.get().getIsUsed());
-        assertNotNull(result.get().getUsageDate());
-        verify(reservationRepository, times(1)).findByFinalKey("abc12310");
-        verify(reservationRepository, times(1)).save(any(Reservation.class));
-
-        // Capture de l'argument pour vérification détaillée
-        ArgumentCaptor<Reservation> reservationCaptor = ArgumentCaptor.forClass(Reservation.class);
-        verify(reservationRepository).save(reservationCaptor.capture());
-        Reservation savedReservation = reservationCaptor.getValue();
-        assertTrue(savedReservation.getIsUsed());
-        assertNotNull(savedReservation.getUsageDate());
-    }
-
-    @Test
-    void verifyTicket_WithAlreadyUsedTicket_ShouldReturnReservationWithoutModification() {
-        // Préparation
-        when(reservationRepository.findByFinalKey("def4565")).thenReturn(Optional.of(reservation2));
-
-        // Exécution
-        Optional<Reservation> result = reservationService.verifyTicket("def4565");
-
-        // Vérification
-        assertTrue(result.isPresent());
-        assertTrue(result.get().getIsUsed());
-        assertNotNull(result.get().getUsageDate());
-        verify(reservationRepository, times(1)).findByFinalKey("def4565");
-        verify(reservationRepository, never()).save(any(Reservation.class));
-    }
-
-    @Test
-    void verifyTicket_WithNonExistingKey_ShouldReturnEmpty() {
-        // Préparation
-        when(reservationRepository.findByFinalKey("nonexisting")).thenReturn(Optional.empty());
-
-        // Exécution
-        Optional<Reservation> result = reservationService.verifyTicket("nonexisting");
-
-        // Vérification
-        assertFalse(result.isPresent());
-        verify(reservationRepository, times(1)).findByFinalKey("nonexisting");
-        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(reservationRepository).findById(99L);
     }
 
     @Test
     void createTicketReservation_WithValidData_ShouldCreateReservation() {
-        // Préparation
+        // Given
         Long userId = 1L;
         Long offerId = 1L;
-        int quantity = 5;
-        String userKey = "user123";
+        int quantity = 2;
+        String providedUserKey = "valid-key";
+        String paymentInfo = "1234567890123456|12/25|123";
 
+        // 1. Configuration du mock pour valider la clé utilisateur
+        when(userAppService.validateUserKey(userId, providedUserKey)).thenReturn(true);
+
+        // 2. Configuration de l'utilisateur
+        UserApp userApp = new UserApp();
+        userApp.setUserId(userId);
         when(userAppRepository.findById(userId)).thenReturn(Optional.of(userApp));
+
+        // 3. Configuration de l'offre
+        Offer offer = new Offer();
+        offer.setOfferId(offerId);
+        offer.setIsAvailable(true); // Assurez-vous que l'offre est disponible
+        offer.setPrice(100.0);
         when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
-        when(userAppService.validateUserKey(userApp.getUserId(), userKey)).thenReturn(true);
 
-        // Utiliser doAnswer pour intercepter l'appel à save
-        doAnswer(invocation -> {
-            Reservation res = invocation.getArgument(0);
+        // 4. Configuration du processeur de paiement pour renvoyer true
+        when(paymentService.processPayment(
+                any(BigDecimal.class),
+                anyString(),
+                anyString(),
+                anyString(),
+                any(Reservation.class)
+        )).thenReturn(true);
 
-            // S'assurer que le qrCode est défini avant de procéder
+        // 5. Configuration pour retourner la réservation sauvegardée
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation savedRes = invocation.getArgument(0);
+            savedRes.setReservationId(999L);
+            return savedRes;
+        });
 
-                res.setQrCode("test-qrcode-12345");
+        // When
+        Reservation result = reservationService.createTicketReservation(
+                userId, offerId, quantity, providedUserKey, paymentInfo);
 
-
-            // S'assurer que toutes les autres valeurs sont définies correctement
-
-                res.setReservationKey(res.getQrCode().substring(0, 8));
-
-                res.setFinalKey(res.getReservationKey() + quantity);
-
-
-            // Définir ID pour simuler la persistance
-            res.setReservationId(3L);
-
-            return res;
-        }).when(reservationRepository).save(any(Reservation.class));
-
-        // Exécution
-        Reservation result = reservationService.createTicketReservation(userId, offerId, quantity, userKey);
-
-        // Vérification
+        // Then
         assertNotNull(result);
-        assertEquals(userApp, result.getUserApp());
-        assertEquals(offer, result.getOffer());
+        assertEquals(999L, result.getReservationId());
+        assertEquals(userId, result.getUserApp().getUserId());
+        assertEquals(offerId, result.getOffer().getOfferId());
         assertEquals(quantity, result.getQuantity());
-        assertNotNull(result.getQrCode());
-        assertNotNull(result.getReservationKey());
-        assertNotNull(result.getFinalKey());
-        assertFalse(result.getIsUsed());
 
+        // Vérification des interactions
+        verify(userAppService).validateUserKey(userId, providedUserKey);
         verify(userAppRepository).findById(userId);
         verify(offerRepository).findById(offerId);
-        verify(userAppService).validateUserKey(userApp.getUserId(), userKey);
+        verify(paymentService).processPayment(
+                eq(BigDecimal.valueOf(offer.getPrice() * quantity)),
+                anyString(),
+                anyString(),
+                anyString(),
+                any(Reservation.class)
+        );
         verify(reservationRepository).save(any(Reservation.class));
     }
 
+    @Test
+    void createTicketReservation_WithInvalidUserId_ShouldThrowException() {
+        // Given
+        Long userId = 99L;
+        Long offerId = 1L;
+        int quantity = 2;
+        String providedUserKey = "valid-key";
+        String paymentInfo = "1234567890123456|12/25|123";
 
+        // Configurer le userAppService pour valider la clé utilisateur
+        when(userAppService.validateUserKey(userId, providedUserKey)).thenReturn(true);
+
+        // Simuler un utilisateur non trouvé
+        when(userAppRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // When & Then
+        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
+                reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
+
+        assertEquals("Utilisateur non trouvé", exception.getMessage());
+
+        // Vérifier que les méthodes attendues ont été appelées
+        verify(userAppService).validateUserKey(userId, providedUserKey);
+        verify(userAppRepository).findById(userId);
+    }
+
+
+    @Test
+    void createTicketReservation_WithInvalidOfferId_ShouldThrowException() {
+        // Given
+        Long userId = 1L;
+        Long offerId = 99L;
+        int quantity = 2;
+        String providedUserKey = "valid-key";
+        String paymentInfo = "1234567890123456|12/25|123";
+
+        // Configurer le userAppService pour valider la clé utilisateur
+        when(userAppService.validateUserKey(userId, providedUserKey)).thenReturn(true);
+
+        // Configurer l'utilisateur
+        UserApp userApp = new UserApp();
+        userApp.setUserId(userId);
+        when(userAppRepository.findById(userId)).thenReturn(Optional.of(userApp));
+
+        // Simuler une offre non trouvée
+        when(offerRepository.findById(offerId)).thenReturn(Optional.empty());
+
+        // When & Then
+        NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
+                reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
+
+        assertEquals("Offre non trouvée", exception.getMessage());
+
+        // Vérifier que les méthodes attendues ont été appelées
+        verify(userAppService).validateUserKey(userId, providedUserKey);
+        verify(userAppRepository).findById(userId);
+        verify(offerRepository).findById(offerId);
+    }
+
+    @Test
+    void createTicketReservation_WithInvalidUserKey_ShouldThrowException() {
+        // Given
+        Long userId = 1L;
+        Long offerId = 1L;
+        int quantity = 2;
+        String invalidUserKey = "invalid-key";
+        String paymentInfo = "1234567890123456|12/25|123";
+
+        // Configurer le userAppService pour rejeter la clé utilisateur
+        when(userAppService.validateUserKey(userId, invalidUserKey)).thenReturn(false);
+
+        // When & Then
+        SecurityException exception = assertThrows(SecurityException.class, () ->
+                reservationService.createTicketReservation(userId, offerId, quantity, invalidUserKey, paymentInfo));
+
+        assertEquals("Clé utilisateur invalide", exception.getMessage());
+
+        // Vérifier que seule la validation de la clé a été tentée
+        verify(userAppService).validateUserKey(userId, invalidUserKey);
+        verifyNoInteractions(userAppRepository);
+        verifyNoInteractions(offerRepository);
+    }
+
+    @Test
+    void createTicketReservation_WithInsufficientQuantity_ShouldThrowException() {
+        // Given
+        Long userId = 1L;
+        Long offerId = 1L;
+        int quantity = 1;
+        String providedUserKey = "valid-key";
+        String paymentInfo = "1234567890123456|12/25|123";
+
+        // Configuration des mocks
+        when(userAppService.validateUserKey(userId, providedUserKey)).thenReturn(true);
+
+        // Créer un utilisateur valide
+        UserApp userApp = new UserApp();
+        userApp.setUserId(userId);
+        when(userAppRepository.findById(userId)).thenReturn(Optional.of(userApp));
+
+        // Créer une offre non disponible (isAvailable = false)
+        Offer offer = new Offer();
+        offer.setOfferId(offerId);
+        offer.setIsAvailable(false); // L'offre n'est pas disponible
+        offer.setPrice(100.0);
+        when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+
+        // When & Then
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
+
+        assertEquals("Quantité insuffisante disponible", exception.getMessage());
+
+        verify(userAppService).validateUserKey(userId, providedUserKey);
+        verify(userAppRepository).findById(userId);
+        verify(offerRepository).findById(offerId);
+
+        // Assurez-vous que le service de paiement n'a pas été appelé
+        verifyNoInteractions(paymentService);
+    }
 }

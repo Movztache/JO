@@ -1,7 +1,8 @@
-package com.example.jeuxolympiques.service;
+package com.example.jeuxolympiques.service.impl;
 
 import com.example.jeuxolympiques.model.Offer;
 import com.example.jeuxolympiques.repository.OfferRepository;
+import com.example.jeuxolympiques.service.OfferService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
