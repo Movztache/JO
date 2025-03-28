@@ -45,11 +45,12 @@ public class Reservation {
     private Offer offer;
 
 
-    @PrePersist
-    private void generateQrCode() {
-        this.qrCode = UUID.randomUUID().toString();
+    public void generateSecureQrCode() {
+        if (this.userApp != null && this.reservationKey != null && this.quantity != null) {
+            // Format: reservationKey + userKey + quantity
+            this.qrCode = this.reservationKey + "|" + this.userApp.getUserKey() + "|" + this.quantity;
+        }
     }
-
     public Long getReservationId() {
         return reservationId;
     }
@@ -77,6 +78,13 @@ public class Reservation {
     public String getFinalKey() {
         return finalKey;
     }
+    public void setFinalKey() {
+        if (this.userApp != null) {
+            this.finalKey = this.reservationKey + this.userApp.getUserKey() + this.quantity;
+        } else {
+            this.finalKey = this.reservationKey + this.quantity;
+        }
+    }
     public void setFinalKey(String finalKey) {
         this.finalKey = finalKey;
     }
@@ -98,14 +106,29 @@ public class Reservation {
     public void setOffer(Offer offer) {
         this.offer = offer;
     }
-    public void setFinalKey() {
-        this.finalKey = this.reservationKey + this.quantity;
-    }
+
+    // Méthode pour extraire la reservationKey du QRCode
     public void setReservationKey() {
-        this.reservationKey = this.qrCode.substring(0, 8);
+        if (this.qrCode != null && this.qrCode.contains("|")) {
+            String[] parts = this.qrCode.split("\\|");
+            if (parts.length >= 1) {
+                this.reservationKey = parts[0];
+            }
+        }
     }
+
+    // Méthode pour extraire la quantité du QRCode
     public void setQuantity() {
-        this.quantity = Integer.parseInt(this.qrCode.substring(8));
+        if (this.qrCode != null && this.qrCode.contains("|")) {
+            String[] parts = this.qrCode.split("\\|");
+            if (parts.length >= 3) {
+                try {
+                    this.quantity = Integer.parseInt(parts[2]);
+                } catch (NumberFormatException e) {
+                    this.quantity = 1; // Valeur par défaut
+                }
+            }
+        }
     }
     public void setReservationDate() {
         this.reservationDate = new Date();
