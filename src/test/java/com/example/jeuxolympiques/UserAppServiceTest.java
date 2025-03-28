@@ -17,7 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.jeuxolympiques.dto.UserRegistrationDTO;
 import com.example.jeuxolympiques.model.UserApp;
 import com.example.jeuxolympiques.repository.UserAppRepository;
-import com.example.jeuxolympiques.service.UserAppServiceImpl;
+import com.example.jeuxolympiques.service.impl.UserAppServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
 public class UserAppServiceTest {

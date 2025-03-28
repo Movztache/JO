@@ -10,7 +10,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -54,7 +53,7 @@ public class CustomUserDetailsServiceTest {
 
         Collection<? extends GrantedAuthority> authorities = userDetails.getAuthorities();
         assertThat(authorities).hasSize(1);
-        assertThat(authorities).extracting("authority").containsExactly("ROLE_USER");
+        assertThat(authorities).extracting("authority").containsExactly("User");
 
         verify(userRepository).findByEmail("test@example.com");
     }

@@ -1,9 +1,10 @@
 // Implémentation du service
-package com.example.jeuxolympiques.service;
+package com.example.jeuxolympiques.service.impl;
 
 import com.example.jeuxolympiques.dto.UserRegistrationDTO;
 import com.example.jeuxolympiques.model.UserApp;
 import com.example.jeuxolympiques.repository.UserAppRepository;
+import com.example.jeuxolympiques.service.UserAppService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -12,13 +13,9 @@ import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
 
-/**
- * Implémentation du service qui gère les opérations liées aux utilisateurs
- */
 @Service
 public class UserAppServiceImpl implements UserAppService {
 

@@ -2,7 +2,7 @@ package com.example.jeuxolympiques;
 
 import com.example.jeuxolympiques.model.Offer;
 import com.example.jeuxolympiques.repository.OfferRepository;
-import com.example.jeuxolympiques.service.OfferServiceImpl;
+import com.example.jeuxolympiques.service.impl.OfferServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

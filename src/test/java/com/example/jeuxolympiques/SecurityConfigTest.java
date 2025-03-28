@@ -2,8 +2,7 @@ package com.example.jeuxolympiques;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.example.jeuxolympiques.security.SecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,9 +85,10 @@ public class SecurityConfigTest {
     }
 
     @Test
-    public void testAdminPageWithoutAuth() throws Exception {
+    void testAdminPageWithoutAuth() throws Exception {
         mockMvc.perform(get("/admin"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?unauthorized"));  // Vérifier l'URL exacte de redirection
     }
 
     @Test
