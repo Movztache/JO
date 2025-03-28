@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +100,7 @@ public class CartController {
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> getCartSummary(Authentication authentication) {
         UserApp user = (UserApp) authentication.getPrincipal();
-        Double total = cartService.calculateCartTotal(user);
+        BigDecimal total = cartService.calculateCartTotal(user);
 
         Map<String, Object> summary = new HashMap<>();
         summary.put("total", total);

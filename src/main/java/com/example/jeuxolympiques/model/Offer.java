@@ -2,6 +2,8 @@ package com.example.jeuxolympiques.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "offer")
 public class Offer {
@@ -19,7 +21,9 @@ public class Offer {
 
     @NotNull(message = "Le prix est obligatoire")
     @DecimalMin(value = "0.0", inclusive = false, message = "Le prix doit être supérieur à 0")
-    private Double price;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal price;
+
 
     @NotBlank(message = "Le type d'offre est obligatoire")
     @Size(max = 50, message = "Le type d'offre ne doit pas dépasser 50 caractères")
@@ -54,13 +58,9 @@ public class Offer {
         this.description = description;
     }
 
-    public Double getPrice() {
-        return price;
-    }
+    public BigDecimal getPrice() { return price;}
 
-    public void setPrice(Double price) {
-        this.price = price;
-    }
+    public void setPrice(BigDecimal price) {this.price = price;}
 
     public String getOfferType() {
         return offerType;
@@ -73,12 +73,15 @@ public class Offer {
     public boolean getIsAvailable() {
         return available;
     }
+
     public void setIsAvailable(boolean available) {
         this.available = available;
     }
+
     public Integer getPersonCount() {
         return personCount;
     }
+
     public void setPersonCount(Integer personCount) {
         this.personCount = personCount;
     }
@@ -86,7 +89,7 @@ public class Offer {
     public Offer() {
 
     }
-    public Offer(String name, String description, Double price, String offerType, Integer personCount) {
+    public Offer(String name, String description, BigDecimal price, String offerType, Integer personCount) {
         this.name = name;
         this.description = description;
         this.price = price;

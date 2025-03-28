@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -34,11 +35,11 @@ public class OfferServiceImplTest {
     @BeforeEach
     public void setup() {
         // Création de données de test
-        offer1 = new Offer("Offre d'essai 1", "Description de test 1", 29.99, "TICKET", 2);
+        offer1 = new Offer("Offre d'essai 1", "Description de test 1", BigDecimal.valueOf(29.99), "TICKET", 2);
         offer1.setOfferId(1L);
         offer1.setIsAvailable(true);
 
-        offer2 = new Offer("Offre d'essai 2", "Description de test 2", 49.99, "ACCOMMODATION", 4);
+        offer2 = new Offer("Offre d'essai 2", "Description de test 2", BigDecimal.valueOf(49.99), "ACCOMMODATION", 4);
         offer2.setOfferId(2L);
         offer2.setIsAvailable(false);
     }
@@ -95,7 +96,7 @@ public class OfferServiceImplTest {
 
         // Then
         assertThat(offers).hasSize(1);
-        assertThat(offers.get(0).getOfferType()).isEqualTo("TICKET");
+        assertThat(offers.getFirst().getOfferType()).isEqualTo("TICKET");
         verify(offerRepository, times(1)).findByOfferType("TICKET");
     }
 
@@ -112,7 +113,7 @@ public class OfferServiceImplTest {
     @Test
     public void testSaveOffer() {
         // Given
-        Offer newOffer = new Offer("Nouvelle offre", "Description nouvelle", 39.99, "TRANSPORT", 3);
+        Offer newOffer = new Offer("Nouvelle offre", "Description nouvelle", BigDecimal.valueOf(39.99), "TRANSPORT", 3);
         when(offerRepository.save(any(Offer.class))).thenReturn(newOffer);
 
         // When
@@ -133,7 +134,7 @@ public class OfferServiceImplTest {
         // When & Then
         assertThatThrownBy(() -> offerService.saveOffer(invalidOffer))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("nom de l'offre ne peut pas être vide");
+                .hasMessageContaining("Le nom de l'offre est obligatoire");
 
         verify(offerRepository, never()).save(any());
     }
@@ -202,15 +203,15 @@ public class OfferServiceImplTest {
 
         // Then
         assertThat(availableOffers).hasSize(1);
-        assertThat(availableOffers.get(0).getOfferId()).isEqualTo(1L);
-        assertThat(availableOffers.get(0).getIsAvailable()).isTrue();
+        assertThat(availableOffers.getFirst().getOfferId()).isEqualTo(1L);
+        assertThat(availableOffers.getFirst().getIsAvailable()).isTrue();
         verify(offerRepository, times(1)).findAll();
     }
 
     @Test
     public void testUpdateOffer() {
         // Given
-        Offer updatedDetails = new Offer("Offre modifiée", "Nouvelle description", 59.99, "TICKET", 2);
+        Offer updatedDetails = new Offer("Offre modifiée", "Nouvelle description", BigDecimal.valueOf(59.99), "TICKET", 2);
         when(offerRepository.findByOfferId(1L)).thenReturn(offer1);
         when(offerRepository.save(any(Offer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -222,7 +223,7 @@ public class OfferServiceImplTest {
         assertThat(updatedOffer.getOfferId()).isEqualTo(1L);
         assertThat(updatedOffer.getName()).isEqualTo("Offre modifiée");
         assertThat(updatedOffer.getDescription()).isEqualTo("Nouvelle description");
-        assertThat(updatedOffer.getPrice()).isEqualTo(59.99);
+        assertThat(updatedOffer.getPrice()).isEqualTo(BigDecimal.valueOf(59.99)); // Modifié pour comparer deux BigDecimal
         verify(offerRepository, times(1)).findByOfferId(1L);
         verify(offerRepository, times(1)).save(offer1);
     }
