@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -109,15 +110,15 @@ public class OfferServiceImpl implements OfferService {
         }
 
         if (offer.getName() == null || offer.getName().trim().isEmpty()) {
-            throw new IllegalArgumentException("Le nom de l'offre ne peut pas être vide");
+            throw new IllegalArgumentException("Le nom de l'offre est obligatoire");
         }
 
-        if (offer.getPrice() == null || offer.getPrice() <= 0) {
+        if (offer.getPrice() == null || offer.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le prix doit être supérieur à zéro");
         }
 
         if (offer.getOfferType() == null || offer.getOfferType().trim().isEmpty()) {
-            throw new IllegalArgumentException("Le type d'offre ne peut pas être vide");
+            throw new IllegalArgumentException("Le type d'offre est obligatoire");
         }
 
         if (offer.getPersonCount() == null || offer.getPersonCount() < 1) {

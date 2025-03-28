@@ -98,7 +98,7 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setIsUsed(false);
 
         // Calculer le montant total à payer
-        double totalAmount = offer.getPrice() * quantity;
+        BigDecimal totalAmount = offer.getPrice().multiply(BigDecimal.valueOf(quantity));
 
         // Extraire les informations de paiement
         String[] paymentDetails = paymentInfo.split("\\|");
@@ -111,8 +111,7 @@ public class ReservationServiceImpl implements ReservationService {
         String cvv = paymentDetails[2];
 
         // Traiter le paiement avec la réservation sauvegardée et un BigDecimal correct
-        BigDecimal amount = BigDecimal.valueOf(totalAmount);
-        boolean paymentSuccess = paymentService.processPayment(amount, cardNumber, expiryDate, cvv, reservation);
+        boolean paymentSuccess = paymentService.processPayment(totalAmount, cardNumber, expiryDate, cvv, reservation);
 
         if (!paymentSuccess) {
             // Annuler la transaction en cas d'échec du paiement

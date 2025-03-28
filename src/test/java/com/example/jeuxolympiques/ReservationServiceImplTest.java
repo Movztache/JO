@@ -129,7 +129,7 @@ public class ReservationServiceImplTest {
         Offer offer = new Offer();
         offer.setOfferId(offerId);
         offer.setIsAvailable(true); // Assurez-vous que l'offre est disponible
-        offer.setPrice(100.0);
+        offer.setPrice(BigDecimal.valueOf(100));
         when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
         // 4. Configuration du processeur de paiement pour renvoyer true
@@ -164,7 +164,7 @@ public class ReservationServiceImplTest {
         verify(userAppRepository).findById(userId);
         verify(offerRepository).findById(offerId);
         verify(paymentService).processPayment(
-                eq(BigDecimal.valueOf(offer.getPrice() * quantity)),
+                eq(offer.getPrice().multiply(BigDecimal.valueOf(quantity))),
                 anyString(),
                 anyString(),
                 anyString(),
@@ -277,7 +277,7 @@ public class ReservationServiceImplTest {
         Offer offer = new Offer();
         offer.setOfferId(offerId);
         offer.setIsAvailable(false); // L'offre n'est pas disponible
-        offer.setPrice(100.0);
+        offer.setPrice(BigDecimal.valueOf(100.0));
         when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
 
         // When & Then

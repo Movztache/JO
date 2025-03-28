@@ -3,6 +3,7 @@ package com.example.jeuxolympiques.service;
 import com.example.jeuxolympiques.dto.CartItemDTO;
 import com.example.jeuxolympiques.model.UserApp;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface CartService {
@@ -50,5 +51,5 @@ public interface CartService {
      * @param userApp L'utilisateur concerné
      * @return Le montant total du panier
      */
-    Double calculateCartTotal(UserApp userApp);
+    BigDecimal calculateCartTotal(UserApp userApp);
 }

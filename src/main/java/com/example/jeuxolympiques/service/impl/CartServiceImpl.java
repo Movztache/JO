@@ -105,13 +105,21 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public Double calculateCartTotal(UserApp userApp) {
-        List<CartItemDTO> cartItems = getCartItems(userApp);
+    public BigDecimal calculateCartTotal(UserApp userApp) {
+        // Récupérer l'ID de l'utilisateur à partir de l'objet UserApp
+        Long userId = userApp.getUserId();
+
+        // Utiliser l'ID pour récupérer les éléments du panier
+        List<Cart> cartItems = cartRepository.findByUserApp(userApp);
+
+        // Calculer le total
         return cartItems.stream()
-                .map(item -> item.getTotalPrice() != null ? item.getTotalPrice() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .doubleValue();
+                .map(item -> item.getOffer().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+
+
 
     /**
      * Convertit un objet Cart en CartItemDTO
@@ -123,12 +131,11 @@ public class CartServiceImpl implements CartService {
         dto.setQuantity(cart.getQuantity());
         dto.setOfferName(cart.getOffer().getName());
 
-        // Convertir Double en BigDecimal
         if (cart.getOffer().getPrice() != null) {
-            BigDecimal price = BigDecimal.valueOf(cart.getOffer().getPrice());
-            dto.setOfferPrice(price);
+            dto.setOfferPrice(cart.getOffer().getPrice());
             // Calculer le prix total (prix unitaire × quantité)
-            BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(cart.getQuantity()));
+            BigDecimal totalPrice = cart.getOffer().getPrice()
+                    .multiply(BigDecimal.valueOf(cart.getQuantity()));
             dto.setTotalPrice(totalPrice);
         } else {
             dto.setOfferPrice(BigDecimal.ZERO);

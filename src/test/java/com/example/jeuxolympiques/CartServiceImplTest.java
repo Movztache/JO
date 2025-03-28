@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -52,7 +53,7 @@ public class CartServiceImplTest {
         testOffer.setOfferId(1L);
         testOffer.setName("Test Offer");
         testOffer.setDescription("Description de l'offre test");
-        testOffer.setPrice(25.99); // Double au lieu de BigDecimal
+        testOffer.setPrice(BigDecimal.valueOf(25.99));
 
         // Initialisation du panier de test
         testCart = new Cart();
@@ -223,7 +224,7 @@ public class CartServiceImplTest {
         // Deuxième article
         Offer offer2 = new Offer();
         offer2.setOfferId(2L);
-        offer2.setPrice(10.50); // Double au lieu de BigDecimal
+        offer2.setPrice(BigDecimal.valueOf(10.50)); // Modifié de 25.45 à 10.50
 
         Cart cart2 = new Cart();
         cart2.setCartId(2L);
@@ -236,11 +237,15 @@ public class CartServiceImplTest {
         when(cartRepository.findByUserApp(testUser)).thenReturn(cartList);
 
         // Act
-        Double result = cartService.calculateCartTotal(testUser);
+        BigDecimal result = cartService.calculateCartTotal(testUser);
 
         // Assert
         assertNotNull(result);
-        assertEquals(83.48, result, 0.01); // 51.98 + 31.50 = 83.48
+        assertTrue(
+                result.subtract(new BigDecimal("83.48")).abs().compareTo(new BigDecimal("0.01")) < 0,
+                "Le total du panier devrait être proche de 83.48"
+        );
         verify(cartRepository, times(1)).findByUserApp(testUser);
     }
+
 }
