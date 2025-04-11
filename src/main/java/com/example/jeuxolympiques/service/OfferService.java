@@ -11,4 +11,6 @@ public interface OfferService {
     Offer saveOffer(Offer offer);
     void deleteOffer(Long id);
     boolean existsById(Long id);
+    Offer updateOffer(Long id, Offer offerDetails);
+    Offer updateOfferAvailability(Long id, boolean available);
 }
