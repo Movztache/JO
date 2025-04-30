@@ -24,8 +24,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Configuration de la sécurité de l'application
@@ -52,13 +57,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
                 // Désactivation de CSRF pour les API REST
                 .csrf(AbstractHttpConfigurer::disable)
 
                 // Configuration des règles d'autorisation pour différents chemins d'URL
                 .authorizeHttpRequests(authorize -> authorize
                         // Routes publiques accessibles sans authentification
-                        .requestMatchers("/", "/home", "/offers/**", "/register", "/api/auth/**").permitAll()
+                        .requestMatchers("/", "/home", "/offers/**", "/register", "/api/auth/**", "/api/offers","/api/cart/**").permitAll()
                         // Permettre l'accès aux pages d'erreur pour tous les utilisateurs
                         .requestMatchers("/error", "/error/**").permitAll()
                         // Routes nécessitant une authentification
@@ -66,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/buy-ticket/**").authenticated()
                         .requestMatchers("/api/reservations/**").authenticated()
                         .requestMatchers("/api/tickets/**").authenticated()
-                        .requestMatchers("/api/cart/**").authenticated()
+                        .requestMatchers("/api/utilisateurs/**").authenticated()
                         // Routes nécessitant un rôle spécifique
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         // Configuration par défaut pour les autres routes
@@ -107,6 +114,18 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     /**

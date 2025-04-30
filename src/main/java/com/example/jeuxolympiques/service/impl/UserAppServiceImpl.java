@@ -99,4 +99,35 @@ public class UserAppServiceImpl implements UserAppService {
                 .map(user -> user.getUserKey().equals(providedKey))
                 .orElse(false);
     }
+
+    @Override
+    public UserApp findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    /**
+     * Met à jour les informations d'un utilisateur existant
+     * @param user L'utilisateur avec les informations mises à jour
+     * @return L'utilisateur mis à jour
+     */
+    @Override
+    @Transactional
+    public UserApp updateUser(UserApp user) {
+        // Vérifier que l'utilisateur existe
+        if (user.getUserId() == null || !userRepository.existsById(user.getUserId())) {
+            throw new IllegalArgumentException("Utilisateur non trouvé avec l'ID : " + user.getUserId());
+        }
+
+        // Récupération de l'utilisateur existant pour vérifier si l'email est changé
+        if (user.getEmail() != null) {
+            UserApp existingUserWithEmail = userRepository.findByEmail(user.getEmail());
+            if (existingUserWithEmail != null && !existingUserWithEmail.getUserId().equals(user.getUserId())) {
+                throw new IllegalArgumentException("Cette adresse email est déjà utilisée par un autre utilisateur");
+            }
+        }
+
+        // Sauvegarder les modifications
+        return userRepository.save(user);
+    }
+
 }
