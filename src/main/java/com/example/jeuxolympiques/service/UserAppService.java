@@ -41,4 +41,19 @@ public interface UserAppService {
      * @return true si la clé correspond, false sinon
      */
     boolean validateUserKey(Long userId, String providedKey);
+
+    /**
+     * Trouve un utilisateur par son email
+     * @param email L'email de l'utilisateur
+     * @return L'utilisateur ou null si aucun utilisateur n'est trouvé
+     */
+    UserApp findByEmail(String email);
+
+    /**
+     * Met à jour les informations d'un utilisateur existant
+     * @param user L'utilisateur avec les informations mises à jour
+     * @return L'utilisateur mis à jour
+     */
+    UserApp updateUser(UserApp user);
+
 }
