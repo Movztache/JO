@@ -14,27 +14,28 @@ import java.util.Optional;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     /**
-     * Recherche un paiement par son identifiant de transaction
+     * Recherche un paiement par son ID de transaction
+     * @param transactionId L'ID de la transaction
+     * @return Le paiement correspondant, s'il existe
      */
     Optional<Payment> findByTransactionId(String transactionId);
 
-
     /**
-     * Compte le nombre de paiements et calcule le montant total par offre
-     * Utilisé pour les statistiques de vente
+     * Compte les ventes et somme les revenus par offre
+     * @return Une liste d'objets contenant [offerId, count, sum]
      */
-    @Query("SELECT p.reservation.offer.offerId, COUNT(p), SUM(p.amount) FROM Payment p " +
-            "WHERE p.status = 'COMPLETED' GROUP BY p.reservation.offer.offerId")
+    @Query("SELECT r.offer.offerId, COUNT(p), SUM(p.amount) FROM Payment p JOIN p.reservation r GROUP BY r.offer.offerId")
     List<Object[]> countAndSumByOffer();
 
-
-    @Query("SELECT p.reservation.offer.offerId, COUNT(p), SUM(p.amount), AVG(p.amount) " +
-            "FROM Payment p " +
-            "WHERE p.paymentDate BETWEEN :start AND :end AND p.status = 'COMPLETED' " +
-            "GROUP BY p.reservation.offer.offerId")
-    List<Object[]> findSalesStatisticsByPeriod(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end);
-
-
+    /**
+     * Trouve les statistiques de vente par période
+     * @param start Date de début
+     * @param end Date de fin
+     * @return Une liste d'objets contenant [offerId, count, totalRevenue, averageAmount]
+     */
+    @Query("SELECT r.offer.offerId, COUNT(p), SUM(p.amount), AVG(p.amount) " +
+            "FROM Payment p JOIN p.reservation r " +
+            "WHERE p.paymentDate BETWEEN :start AND :end " +
+            "GROUP BY r.offer.offerId")
+    List<Object[]> findSalesStatisticsByPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
