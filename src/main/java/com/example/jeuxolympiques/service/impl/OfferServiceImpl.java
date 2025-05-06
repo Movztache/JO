@@ -51,6 +51,13 @@ public class OfferServiceImpl implements OfferService {
     public Offer saveOffer(Offer offer) {
         // Validation des données
         validateOffer(offer);
+
+        // S'assurer que l'ID est null pour une nouvelle entité
+        // Cela permet à Hibernate de générer correctement un nouvel ID
+        if (offer.getOfferId() != null && offer.getOfferId() == 0) {
+            offer.setOfferId(null);
+        }
+
         return offerRepository.save(offer);
     }
 
