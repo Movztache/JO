@@ -30,6 +30,10 @@ public class Reservation {
     private Date usageDate;
 
     @NotNull()
+    @Column(nullable = false)
+    private String status = "PENDING"; // Valeur par défaut
+
+    @NotNull()
     @Min(value = 1, message = "La quantité doit être d'au moins 1")
     @Max(value = 10000, message = "La quantité ne peut pas dépasser 10000")
     private Integer quantity;
@@ -145,6 +149,13 @@ public class Reservation {
     }
     public void setUsageDate(Date usageDate) {
         this.usageDate = usageDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+    public void setStatus(String status) {
+        this.status = status;
     }
 
 }
