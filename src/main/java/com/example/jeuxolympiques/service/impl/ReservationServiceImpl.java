@@ -59,29 +59,37 @@ public class ReservationServiceImpl implements ReservationService {
      * @param userAppId ID de l'utilisateur qui effectue la réservation
      * @param offerId ID de l'offre à réserver
      * @param quantity Nombre de billets à réserver
-     * @param providedUserKey Clé fournie par l'utilisateur pour vérification
+     * @param userKey Clé de l'utilisateur récupérée côté serveur
      * @param paymentInfo Informations de paiement au format "cardNumber|expiryDate|cvv"
      * @return L'objet Reservation créé
-     * @throws SecurityException si la clé utilisateur est invalide
      * @throws NoSuchElementException si l'utilisateur ou l'offre n'existe pas
      * @throws PaymentException si le paiement échoue
      */
     @Override
     @Transactional
-    public Reservation createTicketReservation(Long userAppId, Long offerId, int quantity, String providedUserKey, String paymentInfo) {
-        // Vérification que la clé fournie correspond à l'utilisateur
-        if (!userAppService.validateUserKey(userAppId, providedUserKey)) {
-            throw new SecurityException("Clé utilisateur invalide");
+    public Reservation createTicketReservation(Long userAppId, Long offerId, int quantity, String userKey, String paymentInfo) {
+        // Validation des paramètres d'entrée
+        if (userAppId == null) {
+            throw new IllegalArgumentException("userAppId ne peut pas être null");
         }
 
+        if (offerId == null) {
+            throw new IllegalArgumentException("offerId ne peut pas être null");
+        }
+
+        if (userKey == null || userKey.isEmpty()) {
+            throw new IllegalArgumentException("userKey ne peut pas être null ou vide");
+        }
+
+        // Récupération de l'utilisateur et de l'offre
         UserApp userApp = userAppRepository.findById(userAppId)
-                .orElseThrow(() -> new NoSuchElementException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new NoSuchElementException("Utilisateur non trouvé avec ID: " + userAppId));
 
         Offer offer = offerRepository.findById(offerId)
-                .orElseThrow(() -> new NoSuchElementException("Offre non trouvée"));
+                .orElseThrow(() -> new NoSuchElementException("Offre non trouvée avec ID: " + offerId));
 
         if (!offer.getIsAvailable()) {
-            throw new IllegalStateException("Quantité insuffisante disponible");
+            throw new IllegalStateException("Offre non disponible");
         }
 
         // Création de la réservation
@@ -90,37 +98,58 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setOffer(offer);
         reservation.setQuantity(quantity);
         reservation.setReservationDate(new Date());
-
-        // Utilisation des nouvelles méthodes pour générer les clés automatiquement
-        reservation.setReservationKey(); // Génère une clé de réservation aléatoire
-        reservation.generateSecureQrCode(); // Génère le QR Code sécurisé avec le format requis
-        reservation.setFinalKey(); // Génère la clé finale automatiquement
+        reservation.setStatus("PENDING");
         reservation.setIsUsed(false);
 
-        // Calculer le montant total à payer
-        BigDecimal totalAmount = offer.getPrice().multiply(BigDecimal.valueOf(quantity));
+        // Génération d'une clé de réservation aléatoire
+        String reservationKey = UUID.randomUUID().toString().substring(0, 8);
+        reservation.setReservationKey(reservationKey);
 
-        // Extraire les informations de paiement
+        // Génération de la clé finale
+        String finalKey = generateFinalKey(userKey, reservationKey, quantity);
+        reservation.setFinalKey(finalKey);
+
+        // Génération du QR Code
+        String qrCode = reservationKey + "|" + userKey + "|" + quantity;
+        reservation.setQrCode(qrCode);
+
+        // Traitement du paiement
         String[] paymentDetails = paymentInfo.split("\\|");
         if (paymentDetails.length < 3) {
-            throw new IllegalArgumentException("Informations de paiement invalides");
+            throw new IllegalArgumentException("Informations de paiement invalides: format incorrect");
         }
 
         String cardNumber = paymentDetails[0];
         String expiryDate = paymentDetails[1];
         String cvv = paymentDetails[2];
+        BigDecimal totalAmount = offer.getPrice().multiply(BigDecimal.valueOf(quantity));
 
-        // Traiter le paiement avec la réservation sauvegardée et un BigDecimal correct
-        boolean paymentSuccess = paymentService.processPayment(totalAmount, cardNumber, expiryDate, cvv, reservation);
+        // Sauvegarder d'abord la réservation pour qu'elle ait un ID
+        try {
+            reservation = reservationRepository.save(reservation);
 
-        if (!paymentSuccess) {
-            // Annuler la transaction en cas d'échec du paiement
-            reservationRepository.delete(reservation);
-            throw new PaymentException("Échec du traitement du paiement");
+            // Traiter le paiement avec la réservation déjà sauvegardée
+            boolean paymentSuccess = paymentService.processPayment(totalAmount, cardNumber, expiryDate, cvv, reservation);
+
+            if (!paymentSuccess) {
+                // Annuler la transaction en cas d'échec du paiement
+                reservationRepository.delete(reservation);
+                throw new PaymentException("Échec du traitement du paiement");
+            }
+
+            return reservation;
+        } catch (Exception e) {
+            // En cas d'erreur, essayer de supprimer la réservation si elle a été sauvegardée
+            if (reservation.getReservationId() != null) {
+                try {
+                    reservationRepository.delete(reservation);
+                } catch (Exception ex) {
+                    // Ignorer les erreurs lors de la suppression
+                }
+            }
+            throw e;
         }
-        reservation = reservationRepository.save(reservation);
 
-        return reservation;
     }
 
     /**

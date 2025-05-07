@@ -15,10 +15,10 @@ public interface ReservationService {
      * @param userAppId ID de l'utilisateur qui effectue la réservation
      * @param offerId ID de l'offre à réserver
      * @param quantity Nombre de billets à réserver
-     * @param providedUserKey Clé fournie par l'utilisateur pour vérification
+     * @param userKey Clé de l'utilisateur récupérée côté serveur
      * @param paymentInfo Informations de paiement au format "cardNumber|expiryDate|cvv"
      * @return L'objet Reservation créé
      */
-    Reservation createTicketReservation(Long userAppId, Long offerId, int quantity, String providedUserKey, String paymentInfo);
+    Reservation createTicketReservation(Long userAppId, Long offerId, int quantity, String userKey, String paymentInfo);
 
 }
