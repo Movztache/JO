@@ -6,6 +6,8 @@ import com.example.jeuxolympiques.model.UserApp;
 
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 public interface UserAppService {
     /**
      * Enregistre un nouvel utilisateur à partir du DTO d'inscription
@@ -56,4 +58,39 @@ public interface UserAppService {
      */
     UserApp updateUser(UserApp user);
 
+    /**
+     * Récupère tous les utilisateurs
+     * @return La liste de tous les utilisateurs
+     */
+    List<UserApp> findAllUsers();
+
+    /**
+     * Trouve un utilisateur par son ID
+     * @param userId L'ID de l'utilisateur
+     * @return L'utilisateur ou null si aucun utilisateur n'est trouvé
+     */
+    UserApp findById(Long userId);
+
+    /**
+     * Met à jour le rôle d'un utilisateur
+     * @param userId L'ID de l'utilisateur
+     * @param roleId L'ID du rôle
+     * @return L'utilisateur mis à jour
+     */
+    UserApp updateUserRole(Long userId, Long roleId);
+
+    /**
+     * @deprecated Utiliser {@link #updateUserRole(Long, Long)} à la place
+     */
+    @Deprecated
+    default UserApp updateUserRule(Long userId, Long roleId) {
+        return updateUserRole(userId, roleId);
+    }
+
+    /**
+     * Supprime un utilisateur
+     * @param userId L'ID de l'utilisateur à supprimer
+     * @return true si l'utilisateur a été supprimé, false sinon
+     */
+    boolean deleteUser(Long userId);
 }
