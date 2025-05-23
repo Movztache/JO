@@ -1,0 +1,46 @@
+# ================================
+# FICHIERS A IGNORER POUR DOCKER
+# ================================
+
+# Dossiers de build
+target/
+build/
+out/
+
+# Fichiers IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Fichiers systeme
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# Documentation
+README.md
+HELP.md
+*.md
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Tests
+src/test/
+
+# Configuration locale
+application-local.properties
