@@ -10,9 +10,8 @@ WORKDIR /app
 
 # Copier les fichiers de configuration Maven
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-COPY mvnw.cmd .
+COPY .mvn/ .mvn/
+COPY mvnw mvnw.cmd ./
 
 # Telecharger les dependances (mise en cache Docker)
 RUN ./mvnw dependency:go-offline -B
