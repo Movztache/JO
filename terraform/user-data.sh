@@ -106,6 +106,7 @@ docker run -d \
   -e DATABASE_USERNAME="${db_username}" \
   -e DATABASE_PASSWORD="${db_password}" \
   -e SPRING_PROFILES_ACTIVE="docker" \
+  -e CORS_ORIGINS="http://localhost:4200,https://d2rp6qs91n8yy7.cloudfront.net" \
   ${ecr_repository_uri}:latest
 
 # ============================================================================
