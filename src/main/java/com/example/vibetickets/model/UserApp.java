@@ -39,8 +39,8 @@ public class UserApp {
     private String userKey;
 
     @ManyToOne
-    @JoinColumn(name = "rule_id", nullable = true)
-    private Rule rule;
+    @JoinColumn(name = "role_id", nullable = true)
+    private Role role;
 
     @OneToMany(mappedBy = "userApp", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Cart> carts = new ArrayList<>();
@@ -71,12 +71,12 @@ public class UserApp {
         return password;
     }
 
-    public void setRule(Rule rule) {
-        this.rule = rule;
+    public void setRole(Role role) {
+        this.role = role;
     }
 
-    public Rule getRule() {
-        return rule;
+    public Role getRole() {
+        return role;
     }
 
     public void setEmail(String email) {

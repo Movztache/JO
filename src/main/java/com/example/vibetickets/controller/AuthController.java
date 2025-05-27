@@ -3,9 +3,9 @@ package com.example.vibetickets.controller;
 import com.example.vibetickets.dto.JwtResponse;
 import com.example.vibetickets.dto.LoginRequest;
 import com.example.vibetickets.dto.UserRegistrationDTO;
-import com.example.vibetickets.model.Rule;
+import com.example.vibetickets.model.Role;
 import com.example.vibetickets.model.UserApp;
-import com.example.vibetickets.repository.RuleRepository;
+import com.example.vibetickets.repository.RoleRepository;
 import com.example.vibetickets.repository.UserAppRepository;
 import com.example.vibetickets.security.JwtUtils;
 import com.example.vibetickets.service.UserAppService;
@@ -38,7 +38,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;  // Pour encoder les mots de passe
     private final JwtUtils jwtUtils;  // Pour générer et valider les tokens JWT
     private final UserAppService userAppService;
-    private final RuleRepository ruleRepository;
+    private final RoleRepository roleRepository;
 
     /**
      * Constructeur pour l'injection de dépendances
@@ -50,13 +50,13 @@ public class AuthController {
             PasswordEncoder passwordEncoder,
             JwtUtils jwtUtils,
             UserAppService userAppService,
-            RuleRepository ruleRepository) {
+            RoleRepository roleRepository) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
         this.userAppService = userAppService;
-        this.ruleRepository = ruleRepository;
+        this.roleRepository = roleRepository;
     }
 
     /**
@@ -89,7 +89,7 @@ public class AuthController {
                 jwt,
                 user.getUserId(),
                 user.getEmail(),
-                user.getRule() != null ? user.getRule().getName() : "User"));
+                user.getRole() != null ? user.getRole().getName() : "User"));
     }
 
     /**
@@ -125,15 +125,15 @@ public class AuthController {
         newUser.setUserKey(userKey);
 
         // Attribution du rôle USER
-        Rule userRule = ruleRepository.findByName("User");
+        Role userRole = roleRepository.findByName("User");
 
         // Vérifier si le rôle existe
-        if (userRule == null) {
+        if (userRole == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Erreur: Le rôle USER n'est pas trouvé dans le système."));
         }
 
         // Assigner le rôle directement à l'utilisateur
-        newUser.setRule(userRule);
+        newUser.setRole(userRole);
 
         // Enregistrement de l'utilisateur
         userRepository.save(newUser);

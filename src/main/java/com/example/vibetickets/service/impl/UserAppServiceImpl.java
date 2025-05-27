@@ -2,7 +2,9 @@
 package com.example.vibetickets.service.impl;
 
 import com.example.vibetickets.dto.UserRegistrationDTO;
+import com.example.vibetickets.model.Role;
 import com.example.vibetickets.model.UserApp;
+import com.example.vibetickets.repository.RoleRepository;
 import com.example.vibetickets.repository.UserAppRepository;
 import com.example.vibetickets.service.UserAppService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,19 +16,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class UserAppServiceImpl implements UserAppService {
 
     private final UserAppRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private static final int KEY_LENGTH = 32;
     private static final int MAX_GENERATION_ATTEMPTS = 5;
 
     @Autowired
-    public UserAppServiceImpl(UserAppRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserAppServiceImpl(UserAppRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -130,4 +135,45 @@ public class UserAppServiceImpl implements UserAppService {
         return userRepository.save(user);
     }
 
+    @Override
+    public List<UserApp> findAllUsers() {
+        return userRepository.findAll();
+    }
+
+    @Override
+    public UserApp findById(Long userId) {
+        return userRepository.findById(userId).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public UserApp updateUserRole(Long userId, Long roleId) {
+        UserApp user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur non trouvé avec l'ID : " + userId));
+
+        // Si roleId est null, on supprime le rôle
+        if (roleId == null) {
+            user.setRole(null);
+        } else {
+            // Vérifier que le rôle existe
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new IllegalArgumentException("Rôle non trouvé avec l'ID : " + roleId));
+
+            // Assigner le rôle à l'utilisateur
+            user.setRole(role);
+        }
+
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteUser(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            return false;
+        }
+
+        userRepository.deleteById(userId);
+        return true;
+    }
 }

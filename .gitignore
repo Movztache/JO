@@ -32,17 +32,3 @@ build/
 ### VS Code ###
 .vscode/
 
-### Terraform ###
-terraform/.terraform/
-terraform/.terraform.lock.hcl
-terraform/terraform.tfstate*
-terraform/*.backup
-
-### SSH Keys ###
-*.pem
-terraform/ssh-key*
-vibe-tickets-key-final.pem
-
-### Temporary Files ###
-*.zip
-*.tmp
