@@ -1,6 +1,6 @@
-package com.example.jeuxolympiques.repository;
+package com.example.vibetickets.repository;
 
-import com.example.jeuxolympiques.model.Role;
+import com.example.vibetickets.model.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

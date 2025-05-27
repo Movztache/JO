@@ -1,6 +1,6 @@
-package com.example.jeuxolympiques.service;
+package com.example.vibetickets.service;
 
-import com.example.jeuxolympiques.model.Role;
+import com.example.vibetickets.model.Role;
 import java.util.List;
 import java.util.Optional;
 
