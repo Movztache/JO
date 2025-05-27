@@ -1,8 +1,8 @@
-package com.example.jeuxolympiques.service.impl;
+package com.example.vibetickets.service.impl;
 
-import com.example.jeuxolympiques.model.Role;
-import com.example.jeuxolympiques.repository.RoleRepository;
-import com.example.jeuxolympiques.service.RoleService;
+import com.example.vibetickets.model.Role;
+import com.example.vibetickets.repository.RoleRepository;
+import com.example.vibetickets.service.RoleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,49 +1,6 @@
-<<<<<<<< HEAD:src/main/java/com/example/vibetickets/model/Rule.java
 package com.example.vibetickets.model;
 
 import jakarta.persistence.*;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.validation.constraints.*;
-
-import java.util.ArrayList;
-import java.util.List;
-
-@Entity
-@Table(name = "rule")
-public class Rule {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long ruleId;
-
-    @NotBlank(message = "Le nom du rôle est obligatoire")
-    private String name;
-
-    @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<UserApp> userApps = new ArrayList<>();
-
-
-    public Long getRuleId() {
-        return ruleId;
-    }
-    public void setRuleId(Long id) {
-        this.ruleId = id;
-    }
-    public void setName(String name) {
-        this.name = name;
-    }
-    public String getName() {
-        return name;
-    }
-
-}
-========
-package com.example.jeuxolympiques.model;
-
-import jakarta.persistence.*;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.validation.constraints.*;
 
 import java.util.ArrayList;
@@ -63,19 +20,46 @@ public class Role {
     @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UserApp> userApps = new ArrayList<>();
 
+    // Constructeurs
+    public Role() {}
 
+    public Role(String name) {
+        this.name = name;
+    }
+
+    // Getters et Setters
     public Long getRoleId() {
         return roleId;
     }
-    public void setRoleId(Long id) {
-        this.roleId = id;
+
+    public void setRoleId(Long roleId) {
+        this.roleId = roleId;
     }
-    public void setName(String name) {
-        this.name = name;
-    }
+
     public String getName() {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<UserApp> getUserApps() {
+        return userApps;
+    }
+
+    public void setUserApps(List<UserApp> userApps) {
+        this.userApps = userApps;
+    }
+
+    // Méthodes utilitaires
+    public void addUserApp(UserApp userApp) {
+        userApps.add(userApp);
+        userApp.setRole(this);
+    }
+
+    public void removeUserApp(UserApp userApp) {
+        userApps.remove(userApp);
+        userApp.setRole(null);
+    }
 }
->>>>>>>> e14ad7b2bdf951c725bb316d22afd25ef6c1448e:src/main/java/com/example/vibetickets/model/Role.java
