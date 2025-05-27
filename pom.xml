@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
-	<artifactId>jeux-olympiques</artifactId>
+	<artifactId>vibe-tickets</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>jeux-olympiques</name>
-	<description>Projet sur les Jeux olympiques</description>
+	<name>vibe-tickets</name>
+	<description>Application de vente de billets Vibe Tickets</description>
 	<url/>
 	<licenses>
 		<license/>

@@ -77,7 +77,7 @@ variable "db_allocated_storage" {
 variable "db_name" {
   description = "Database name"
   type        = string
-  default     = "jeux_olympiques"
+  default     = "vibe_tickets"
 }
 
 variable "db_username" {
@@ -101,4 +101,14 @@ variable "ecr_repository_name" {
   description = "ECR repository name"
   type        = string
   default     = "vibe-tickets"
+}
+
+# ============================================================================
+# FRONTEND VARIABLES
+# ============================================================================
+
+variable "frontend_url" {
+  description = "URL of the frontend application (CloudFront)"
+  type        = string
+  default     = "https://d2rp6qs91n8yy7.cloudfront.net"
 }

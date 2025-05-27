@@ -25,3 +25,6 @@ db_password          = "adminco123"
 
 # ECR
 ecr_repository_name = "vibe-tickets"
+
+# Frontend
+frontend_url = "https://d2rp6qs91n8yy7.cloudfront.net"

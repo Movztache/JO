@@ -41,7 +41,7 @@ RUN apk add --no-cache curl
 WORKDIR /app
 
 # Copier le JAR depuis le stage de build
-COPY --from=builder /app/target/jeux-olympiques-*.jar app.jar
+COPY --from=builder /app/target/vibe-tickets-*.jar app.jar
 
 # Changer le proprietaire des fichiers
 RUN chown -R appuser:appgroup /app

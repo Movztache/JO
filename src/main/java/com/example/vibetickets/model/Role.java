@@ -1,0 +1,81 @@
+<<<<<<<< HEAD:src/main/java/com/example/vibetickets/model/Rule.java
+package com.example.vibetickets.model;
+
+import jakarta.persistence.*;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.validation.constraints.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "rule")
+public class Rule {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long ruleId;
+
+    @NotBlank(message = "Le nom du rôle est obligatoire")
+    private String name;
+
+    @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserApp> userApps = new ArrayList<>();
+
+
+    public Long getRuleId() {
+        return ruleId;
+    }
+    public void setRuleId(Long id) {
+        this.ruleId = id;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+
+}
+========
+package com.example.jeuxolympiques.model;
+
+import jakarta.persistence.*;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.validation.constraints.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "role")
+public class Role {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long roleId;
+
+    @NotBlank(message = "Le nom du rôle est obligatoire")
+    private String name;
+
+    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserApp> userApps = new ArrayList<>();
+
+
+    public Long getRoleId() {
+        return roleId;
+    }
+    public void setRoleId(Long id) {
+        this.roleId = id;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+
+}
+>>>>>>>> e14ad7b2bdf951c725bb316d22afd25ef6c1448e:src/main/java/com/example/vibetickets/model/Role.java
