@@ -20,7 +20,7 @@
 #
 # ============================================================================
 
-name: 🔍 Backend PR Validation
+name: Backend PR Validation
 
 # ============================================================================
 # CONFIGURATION DES DÉCLENCHEURS
@@ -170,13 +170,10 @@ jobs:
       # ----------------------------------------------------------------------
       - name: 🧪 Tests unitaires et d'intégration
         run: |
-          echo "🧪 Exécution de tous les tests..."
+          echo "Execution de tous les tests..."
           mvn clean test -B
 
-          echo "📊 Génération du rapport de couverture..."
-          mvn jacoco:report
-
-          echo "✅ Tests terminés avec succès"
+          echo "Tests termines avec succes"
         env:
           SPRING_PROFILES_ACTIVE: test
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/vibe_tickets_test

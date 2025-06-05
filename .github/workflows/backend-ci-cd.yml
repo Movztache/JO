@@ -33,7 +33,7 @@
 #
 # ============================================================================
 
-name: 🚀 Backend CI/CD Pipeline
+name: Backend CI/CD Pipeline
 
 # ============================================================================
 # CONFIGURATION DES DÉCLENCHEURS
@@ -108,7 +108,7 @@ jobs:
   # JOB 1: TESTS ET VALIDATION (CI)
   # ==========================================================================
   test-and-build:
-    name: 🧪 Tests et Build
+    name: Tests et Build
     runs-on: ubuntu-latest
     
     # Configuration des services pour les tests d'intégration
@@ -132,7 +132,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 1: Récupération du code source
       # ----------------------------------------------------------------------
-      - name: 📥 Checkout du code source
+      - name: Checkout du code source
         uses: actions/checkout@v4
         with:
           # Récupérer tout l'historique pour les analyses de qualité
@@ -141,7 +141,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 2: Configuration de l'environnement Java
       # ----------------------------------------------------------------------
-      - name: ☕ Configuration de Java ${{ env.JAVA_VERSION }}
+      - name: Configuration de Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
@@ -185,11 +185,8 @@ jobs:
       - name: 🧪 Tests unitaires
         if: ${{ !inputs.skip_tests }}
         run: |
-          echo "🧪 Exécution des tests unitaires..."
+          echo "Execution des tests unitaires..."
           mvn test -B
-
-          echo "📊 Génération du rapport de couverture..."
-          mvn jacoco:report
         env:
           # Configuration pour les tests avec base de données
           SPRING_PROFILES_ACTIVE: test
