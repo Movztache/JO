@@ -161,20 +161,20 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 4: Validation et compilation
       # ----------------------------------------------------------------------
-      - name: 🔍 Validation du projet Maven
+      - name:  Validation du projet Maven
         run: |
-          echo "🔍 Validation de la structure du projet..."
+          echo " Validation de la structure du projet..."
           mvn validate
           
-          echo "📋 Informations sur le projet:"
+          echo " Informations sur le projet:"
           mvn help:effective-pom -q
           
-          echo "📦 Dépendances du projet:"
+          echo " Dépendances du projet:"
           mvn dependency:tree
 
-      - name: 🏗️ Compilation du code source
+      - name: Compilation du code source
         run: |
-          echo "🏗️ Compilation du code source..."
+          echo " Compilation du code source..."
           mvn clean compile -B
           
           echo "✅ Compilation terminée avec succès"
@@ -182,7 +182,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 5: Exécution des tests
       # ----------------------------------------------------------------------
-      - name: 🧪 Tests unitaires
+      - name:  Tests unitaires
         if: ${{ !inputs.skip_tests }}
         run: |
           echo "Execution des tests unitaires..."
@@ -210,7 +210,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 7: Upload des artefacts pour les jobs suivants
       # ----------------------------------------------------------------------
-      - name: 📤 Upload de l'artefact JAR
+      - name: Upload de l'artefact JAR
         uses: actions/upload-artifact@v4
         with:
           name: vibe-tickets-jar
@@ -220,7 +220,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 8: Upload des rapports de tests
       # ----------------------------------------------------------------------
-      - name: 📊 Upload des rapports de tests
+      - name:  Upload des rapports de tests
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -256,13 +256,13 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 1: Récupération du code source
       # ----------------------------------------------------------------------
-      - name: 📥 Checkout du code source
+      - name:  Checkout du code source
         uses: actions/checkout@v4
 
       # ----------------------------------------------------------------------
       # ÉTAPE 2: Configuration des credentials AWS
       # ----------------------------------------------------------------------
-      - name: 🔐 Configuration des credentials AWS
+      - name:  Configuration des credentials AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -276,10 +276,10 @@ jobs:
       # ----------------------------------------------------------------------
       - name: ✅ Vérification des permissions AWS
         run: |
-          echo "🔍 Vérification de l'identité AWS..."
+          echo " Vérification de l'identité AWS..."
           aws sts get-caller-identity
 
-          echo "🔍 Vérification de l'accès ECR..."
+          echo " Vérification de l'accès ECR..."
           aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || {
             echo "❌ Repository ECR non trouvé ou permissions insuffisantes"
             exit 1
@@ -290,9 +290,9 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 4: Authentification Docker vers ECR
       # ----------------------------------------------------------------------
-      - name: 🐳 Authentification Docker vers ECR
+      - name:  Authentification Docker vers ECR
         run: |
-          echo "🔐 Authentification vers ECR..."
+          echo " Authentification vers ECR..."
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
             docker login --username AWS --password-stdin \
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
@@ -302,7 +302,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 5: Reconstruction et push de l'image Docker
       # ----------------------------------------------------------------------
-      - name: 📥 Download de l'artefact JAR
+      - name:  Download de l'artefact JAR
         uses: actions/download-artifact@v4
         with:
           name: vibe-tickets-jar
@@ -343,7 +343,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 6: Installation et configuration de Terraform
       # ----------------------------------------------------------------------
-      - name: 🏗️ Installation de Terraform
+      - name:  Installation de Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -353,9 +353,9 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 7: Génération des clés SSH pour EC2
       # ----------------------------------------------------------------------
-      - name: 🔑 Génération des clés SSH
+      - name:  Génération des clés SSH
         run: |
-          echo "🔑 Génération des clés SSH pour EC2..."
+          echo " Génération des clés SSH pour EC2..."
 
           # Génération du nom de clé avec timestamp
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -374,13 +374,13 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 8: Mise à jour des variables Terraform
       # ----------------------------------------------------------------------
-      - name: 📝 Mise à jour des variables Terraform
+      - name:  Mise à jour des variables Terraform
         run: |
           cd terraform
 
           IMAGE_TAG="${{ steps.docker-build.outputs.image-tag }}"
 
-          echo "📝 Mise à jour de terraform.tfvars..."
+          echo " Mise à jour de terraform.tfvars..."
 
           # Mise à jour du tag d'image
           sed -i "s/^image_tag = .*/image_tag = \"${IMAGE_TAG}\"/" terraform.tfvars
@@ -388,21 +388,53 @@ jobs:
           # Mise à jour du nom de clé SSH
           sed -i "s/^ec2_key_name = .*/ec2_key_name = \"${SSH_KEY_NAME}\"/" terraform.tfvars
 
-          echo "📋 Variables Terraform mises à jour:"
+          echo " Variables Terraform mises à jour:"
           grep -E "^(image_tag|ec2_key_name)" terraform.tfvars
 
           echo "✅ Variables Terraform configurées"
 
       # ----------------------------------------------------------------------
-      # ÉTAPE 9: Déploiement avec Terraform
+      # ÉTAPE 9: Nettoyage des ressources conflictuelles
       # ----------------------------------------------------------------------
-      - name: 🚀 Initialisation de Terraform
+      - name: Nettoyage des ressources AWS existantes
+        run: |
+          echo "Nettoyage des ressources AWS conflictuelles..."
+
+          # Supprimer le repository ECR s'il existe
+          aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} 2>/dev/null && {
+            echo "Suppression du repository ECR existant..."
+            aws ecr delete-repository --repository-name vibe-tickets --region ${{ env.AWS_REGION }} --force
+          } || echo "Repository ECR n'existe pas"
+
+          # Supprimer le DB subnet group s'il existe
+          aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} 2>/dev/null && {
+            echo "Suppression du DB subnet group existant..."
+            aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }}
+          } || echo "DB subnet group n'existe pas"
+
+          # Supprimer le role IAM s'il existe
+          aws iam get-role --role-name vibe-tickets-ec2-role 2>/dev/null && {
+            echo "Suppression du role IAM existant..."
+            # Detacher les policies d'abord
+            aws iam list-attached-role-policies --role-name vibe-tickets-ec2-role --query 'AttachedPolicies[].PolicyArn' --output text | xargs -r -n1 aws iam detach-role-policy --role-name vibe-tickets-ec2-role --policy-arn
+            # Supprimer les instance profiles
+            aws iam list-instance-profiles-for-role --role-name vibe-tickets-ec2-role --query 'InstanceProfiles[].InstanceProfileName' --output text | xargs -r -n1 aws iam remove-role-from-instance-profile --role-name vibe-tickets-ec2-role --instance-profile-name
+            # Supprimer le role
+            aws iam delete-role --role-name vibe-tickets-ec2-role
+          } || echo "Role IAM n'existe pas"
+
+          echo "Nettoyage termine"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 10: Déploiement avec Terraform
+      # ----------------------------------------------------------------------
+      - name: Initialisation de Terraform
         run: |
           cd terraform
-          echo "🔧 Initialisation de Terraform..."
+          echo " Initialisation de Terraform..."
           terraform init
 
-          echo "📋 Validation de la configuration..."
+          echo " Validation de la configuration..."
           terraform validate
 
           echo "✅ Terraform initialisé et validé"
@@ -417,7 +449,7 @@ jobs:
 
           echo "Plan Terraform genere avec succes"
 
-      - name: 🚀 Application Terraform
+      - name: Application Terraform
         id: deploy
         run: |
           cd terraform
@@ -430,7 +462,7 @@ jobs:
           ECR_URL=$(terraform output -raw ecr_repository_url)
 
           echo "✅ Déploiement Terraform terminé"
-          echo "📋 Informations de déploiement:"
+          echo " Informations de déploiement:"
           echo "   - IP EC2: ${EC2_IP}"
           echo "   - RDS Endpoint: ${RDS_ENDPOINT}"
           echo "   - ECR URL: ${ECR_URL}"
@@ -440,15 +472,15 @@ jobs:
           echo "rds-endpoint=${RDS_ENDPOINT}" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------------
-      # ÉTAPE 10: Health Checks et validation du déploiement
+      # ÉTAPE 11: Health Checks et validation du déploiement
       # ----------------------------------------------------------------------
-      - name: 🏥 Health Checks de l'application
+      - name: Health Checks de l'application
         run: |
           EC2_IP="${{ steps.deploy.outputs.ec2-ip }}"
           APP_URL="http://${EC2_IP}:8080"
 
-          echo "🏥 Vérification de la santé de l'application..."
-          echo "📍 URL de l'application: ${APP_URL}"
+          echo " Vérification de la santé de l'application..."
+          echo " URL de l'application: ${APP_URL}"
 
           # Attendre que l'application démarre (max 5 minutes)
           echo "⏳ Attente du démarrage de l'application..."
@@ -468,9 +500,9 @@ jobs:
           done
 
           # Vérification détaillée de la santé
-          echo "🔍 Vérification détaillée de la santé..."
+          echo " Vérification détaillée de la santé..."
           HEALTH_RESPONSE=$(curl -s "${APP_URL}/actuator/health")
-          echo "📋 Réponse health check: ${HEALTH_RESPONSE}"
+          echo " Réponse health check: ${HEALTH_RESPONSE}"
 
           # Vérification que la base de données est connectée
           if echo "${HEALTH_RESPONSE}" | grep -q '"status":"UP"'; then
@@ -493,9 +525,9 @@ jobs:
           echo "✅ Tous les health checks sont passés"
 
       # ----------------------------------------------------------------------
-      # ÉTAPE 11: Nettoyage des ressources temporaires
+      # ÉTAPE 12: Nettoyage des ressources temporaires
       # ----------------------------------------------------------------------
-      - name: 🧹 Nettoyage des ressources temporaires
+      - name: Nettoyage des ressources temporaires
         if: always()
         run: |
           echo "🧹 Nettoyage des clés SSH temporaires..."
@@ -510,7 +542,7 @@ jobs:
   # JOB 4: NOTIFICATION ET RAPPORT DE DÉPLOIEMENT
   # ==========================================================================
   notify-deployment:
-    name: 📢 Notification de déploiement
+    name: Notification de déploiement
     runs-on: ubuntu-latest
     needs: [test-and-build, deploy-aws]
     if: always() && github.ref == 'refs/heads/main'
@@ -519,7 +551,7 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 1: Préparation du rapport de déploiement
       # ----------------------------------------------------------------------
-      - name: 📊 Préparation du rapport de déploiement
+      - name: Préparation du rapport de déploiement
         id: report
         run: |
           # Détermination du statut global
@@ -551,15 +583,15 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 2: Création du résumé GitHub
       # ----------------------------------------------------------------------
-      - name: 📋 Résumé de déploiement GitHub
+      - name: Résumé de déploiement GitHub
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
           # 🚀 Rapport de Déploiement Vibe-Tickets Backend
 
-          ## 📊 Statut Global
+          ## Statut Global
           **${{ steps.report.outputs.status }}**
 
-          ## 📋 Informations de Déploiement
+          ## Informations de Déploiement
           - **Commit**: \`${{ steps.report.outputs.commit-sha }}\`
           - **Auteur**: ${{ steps.report.outputs.author }}
           - **Message**: ${{ steps.report.outputs.commit-msg }}
