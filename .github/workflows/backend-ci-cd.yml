@@ -232,99 +232,12 @@ jobs:
           if-no-files-found: warn
 
   # ==========================================================================
-  # JOB 2: BUILD ET PUSH DOCKER (CI)
-  # ==========================================================================
-  docker-build:
-    name: Build Docker
-    runs-on: ubuntu-latest
-    needs: test-and-build
-    
-    # Variables spécifiques à ce job
-    env:
-      IMAGE_TAG: v$(date +%Y%m%d-%H%M%S)
-    
-    outputs:
-      # Exposer le tag de l'image pour les jobs suivants
-      image-tag: ${{ steps.generate-tag.outputs.tag }}
-      ecr-uri: ${{ steps.generate-tag.outputs.ecr-uri }}
-
-    steps:
-      # ----------------------------------------------------------------------
-      # ÉTAPE 1: Récupération du code et des artefacts
-      # ----------------------------------------------------------------------
-      - name: 📥 Checkout du code source
-        uses: actions/checkout@v4
-
-      - name: 📥 Download de l'artefact JAR
-        uses: actions/download-artifact@v4
-        with:
-          name: vibe-tickets-jar
-          path: target/
-
-      # ----------------------------------------------------------------------
-      # ÉTAPE 2: Génération du tag avec timestamp
-      # ----------------------------------------------------------------------
-      - name: 🏷️ Génération du tag Docker
-        id: generate-tag
-        run: |
-          # Génération du timestamp au format utilisé par le projet
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          IMAGE_TAG="v${TIMESTAMP}"
-          
-          # Construction de l'URI ECR complète
-          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}"
-          
-          echo "🏷️ Tag généré: ${IMAGE_TAG}"
-          echo "🏷️ URI ECR: ${ECR_URI}"
-          
-          # Export des variables pour les étapes suivantes
-          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "ecr-uri=${ECR_URI}" >> "$GITHUB_OUTPUT"
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
-
-      # ----------------------------------------------------------------------
-      # ÉTAPE 3: Configuration de Docker Buildx
-      # ----------------------------------------------------------------------
-      - name: 🔧 Configuration de Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          # Utiliser le driver docker-container pour les fonctionnalités avancées
-          driver: docker-container
-
-      # ----------------------------------------------------------------------
-      # ÉTAPE 4: Build de l'image Docker
-      # ----------------------------------------------------------------------
-      - name: 🐳 Build de l'image Docker
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          tags: |
-            vibe-tickets:${{ steps.generate-tag.outputs.tag }}
-            vibe-tickets:latest
-          # Optimisations pour le cache
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          # Build multi-plateforme si nécessaire
-          platforms: linux/amd64
-
-      # ----------------------------------------------------------------------
-      # ÉTAPE 5: Tests de sécurité de l'image Docker
-      # ----------------------------------------------------------------------
-      - name: Validation de l'image Docker
-        run: |
-          echo "Validation de l'image Docker creee..."
-          docker images vibe-tickets:${{ steps.generate-tag.outputs.tag }}
-          echo "Image Docker validee avec succes"
-
-  # ==========================================================================
-  # JOB 3: DÉPLOIEMENT AWS (CD) - UNIQUEMENT SUR MAIN
+  # JOB 2: DÉPLOIEMENT AWS (CD) - UNIQUEMENT SUR MAIN
   # ==========================================================================
   deploy-aws:
-    name: 🚀 Déploiement AWS
+    name: Deploiement AWS
     runs-on: ubuntu-latest
-    needs: [test-and-build, docker-build]
+    needs: test-and-build
 
     # Exécuter uniquement sur la branche main et si ce n'est pas une PR
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -333,6 +246,11 @@ jobs:
     environment:
       name: ${{ inputs.environment || 'dev' }}
       url: http://${{ steps.deploy.outputs.ec2-ip }}:8080
+
+    outputs:
+      # Exposer les informations de déploiement
+      ec2-ip: ${{ steps.deploy.outputs.ec2-ip }}
+      image-tag: ${{ steps.docker-build.outputs.image-tag }}
 
     steps:
       # ----------------------------------------------------------------------
@@ -390,24 +308,37 @@ jobs:
           name: vibe-tickets-jar
           path: target/
 
-      - name: 🐳 Build et Push vers ECR
+      - name: Build et Push vers ECR
+        id: docker-build
         run: |
-          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
-          ECR_URI="${{ needs.docker-build.outputs.ecr-uri }}"
+          # Generation du tag avec timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          IMAGE_TAG="v${TIMESTAMP}"
+          ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          ECR_REPOSITORY="${{ env.ECR_REPOSITORY }}"
+          ECR_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
 
-          echo "🏗️ Build de l'image Docker pour ECR..."
+          echo "Tag genere: ${IMAGE_TAG}"
+          echo "ECR Registry: ${ECR_REGISTRY}"
+          echo "ECR Repository: ${ECR_REPOSITORY}"
+          echo "ECR URI complete: ${ECR_URI}"
+
+          echo "Build de l'image Docker pour ECR..."
           docker build -t vibe-tickets:${IMAGE_TAG} .
 
-          echo "🏷️ Tag de l'image pour ECR..."
+          echo "Tag de l'image pour ECR..."
           docker tag vibe-tickets:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
           docker tag vibe-tickets:${IMAGE_TAG} ${ECR_URI}:latest
 
-          echo "📤 Push vers ECR..."
+          echo "Push vers ECR..."
           docker push ${ECR_URI}:${IMAGE_TAG}
           docker push ${ECR_URI}:latest
 
-          echo "✅ Image pushée avec succès vers ECR"
-          echo "📋 Tag utilisé: ${IMAGE_TAG}"
+          echo "Image pushee avec succes vers ECR"
+          echo "Tag utilise: ${IMAGE_TAG}"
+
+          # Export pour les etapes suivantes
+          echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------------
       # ÉTAPE 6: Installation et configuration de Terraform
@@ -447,7 +378,7 @@ jobs:
         run: |
           cd terraform
 
-          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
+          IMAGE_TAG="${{ steps.docker-build.outputs.image-tag }}"
 
           echo "📝 Mise à jour de terraform.tfvars..."
 
@@ -579,7 +510,7 @@ jobs:
   notify-deployment:
     name: 📢 Notification de déploiement
     runs-on: ubuntu-latest
-    needs: [test-and-build, docker-build, deploy-aws]
+    needs: [test-and-build, deploy-aws]
     if: always() && github.ref == 'refs/heads/main'
 
     steps:
@@ -591,7 +522,6 @@ jobs:
         run: |
           # Détermination du statut global
           if [[ "${{ needs.test-and-build.result }}" == "success" &&
-                "${{ needs.docker-build.result }}" == "success" &&
                 "${{ needs.deploy-aws.result }}" == "success" ]]; then
             STATUS="✅ SUCCÈS"
             COLOR="good"
@@ -604,7 +534,7 @@ jobs:
           COMMIT_SHA="${{ github.sha }}"
           COMMIT_MSG="${{ github.event.head_commit.message || 'Manual deployment' }}"
           AUTHOR="${{ github.event.head_commit.author.name || github.actor }}"
-          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
+          IMAGE_TAG="${{ needs.deploy-aws.outputs.image-tag }}"
 
           # Nettoyer le message de commit pour éviter les caractères problématiques
           COMMIT_MSG_CLEAN=$(echo "$COMMIT_MSG" | tr -d '\n\r' | sed 's/[^a-zA-Z0-9 ._-]//g')
@@ -634,11 +564,10 @@ jobs:
           - **Tag Docker**: \`${{ steps.report.outputs.image-tag }}\`
           - **Environnement**: ${{ inputs.environment || 'dev' }}
 
-          ## 🔍 Détail des Jobs
+          ## Détail des Jobs
           | Job | Statut | Durée |
           |-----|--------|-------|
           | Tests et Build | ${{ needs.test-and-build.result == 'success' && '✅' || '❌' }} | - |
-          | Docker Build | ${{ needs.docker-build.result == 'success' && '✅' || '❌' }} | - |
           | Déploiement AWS | ${{ needs.deploy-aws.result == 'success' && '✅' || '❌' }} | - |
 
           ## 🔗 Liens Utiles
