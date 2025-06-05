@@ -1,0 +1,668 @@
+# ============================================================================
+# PIPELINE CI/CD GITHUB ACTIONS - BACKEND SPRING BOOT VIBE-TICKETS
+# ============================================================================
+#
+# Ce pipeline automatise le déploiement complet du backend Spring Boot :
+#
+# DÉCLENCHEURS :
+# - Push sur la branche main (déploiement automatique)
+# - Push sur les branches feature/* (tests uniquement)
+# - Pull Requests vers main (tests et validation)
+#
+# ÉTAPES CI (Continuous Integration) :
+# 1. Checkout du code source
+# 2. Configuration de Java 21 et Maven
+# 3. Cache des dépendances Maven pour optimiser les builds
+# 4. Tests unitaires et d'intégration
+# 5. Build de l'application Spring Boot
+# 6. Création de l'image Docker avec tag timestamp
+# 7. Tests de sécurité et qualité du code
+#
+# ÉTAPES CD (Continuous Deployment) - UNIQUEMENT SUR MAIN :
+# 8. Authentification AWS et push vers ECR
+# 9. Mise à jour des variables Terraform
+# 10. Déploiement de l'infrastructure avec Terraform
+# 11. Health checks et validation du déploiement
+# 12. Notification du statut de déploiement
+#
+# SÉCURITÉ :
+# - Utilisation de secrets GitHub pour les credentials AWS
+# - Scan de sécurité des images Docker
+# - Validation des variables d'environnement
+# - Isolation des environnements (dev/staging/prod)
+#
+# ============================================================================
+
+name: 🚀 Backend CI/CD Pipeline
+
+# ============================================================================
+# CONFIGURATION DES DÉCLENCHEURS
+# ============================================================================
+on:
+  # Déclenchement automatique sur push vers main (déploiement complet)
+  push:
+    branches: 
+      - main
+      - develop
+    # Filtrer uniquement les changements affectant le backend
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'Dockerfile'
+      - 'terraform/**'
+      - 'scripts/**'
+      - '.github/workflows/backend-ci-cd.yml'
+
+  # Déclenchement sur Pull Requests (tests uniquement, pas de déploiement)
+  pull_request:
+    branches: 
+      - main
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'Dockerfile'
+      - '.github/workflows/backend-ci-cd.yml'
+
+  # Déclenchement manuel avec paramètres personnalisables
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement de déploiement'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      skip_tests:
+        description: 'Ignorer les tests (déconseillé pour prod)'
+        required: false
+        default: false
+        type: boolean
+
+# ============================================================================
+# VARIABLES D'ENVIRONNEMENT GLOBALES
+# ============================================================================
+env:
+  # Configuration AWS
+  AWS_REGION: eu-west-3
+  ECR_REPOSITORY: vibe-tickets
+  
+  # Configuration Java et Maven
+  JAVA_VERSION: '21'
+  MAVEN_OPTS: '-Xmx1024m -XX:MaxPermSize=256m'
+  
+  # Configuration Docker
+  DOCKER_BUILDKIT: 1
+  
+  # Configuration Terraform
+  TF_VERSION: '1.6.0'
+  TF_VAR_aws_region: eu-west-3
+
+# ============================================================================
+# DÉFINITION DES JOBS
+# ============================================================================
+jobs:
+  # ==========================================================================
+  # JOB 1: TESTS ET VALIDATION (CI)
+  # ==========================================================================
+  test-and-build:
+    name: 🧪 Tests et Build
+    runs-on: ubuntu-latest
+    
+    # Configuration des services pour les tests d'intégration
+    services:
+      # Base de données PostgreSQL pour les tests d'intégration
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: vibe_tickets_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code source
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+        with:
+          # Récupérer tout l'historique pour les analyses de qualité
+          fetch-depth: 0
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Configuration de l'environnement Java
+      # ----------------------------------------------------------------------
+      - name: ☕ Configuration de Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'eclipse-temurin'
+          
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Cache des dépendances Maven
+      # ----------------------------------------------------------------------
+      - name: 📦 Cache des dépendances Maven
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Validation et compilation
+      # ----------------------------------------------------------------------
+      - name: 🔍 Validation du projet Maven
+        run: |
+          echo "🔍 Validation de la structure du projet..."
+          mvn validate
+          
+          echo "📋 Informations sur le projet:"
+          mvn help:effective-pom -q
+          
+          echo "📦 Dépendances du projet:"
+          mvn dependency:tree
+
+      - name: 🏗️ Compilation du code source
+        run: |
+          echo "🏗️ Compilation du code source..."
+          mvn clean compile -B
+          
+          echo "✅ Compilation terminée avec succès"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 5: Exécution des tests
+      # ----------------------------------------------------------------------
+      - name: 🧪 Tests unitaires
+        if: ${{ !inputs.skip_tests }}
+        run: |
+          echo "🧪 Exécution des tests unitaires..."
+          mvn test -B
+          
+          echo "📊 Génération du rapport de couverture..."
+          mvn jacoco:report
+        env:
+          # Configuration pour les tests avec base de données
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/vibe_tickets_test
+          SPRING_DATASOURCE_USERNAME: test_user
+          SPRING_DATASOURCE_PASSWORD: test_password
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 6: Build de l'application
+      # ----------------------------------------------------------------------
+      - name: 📦 Build de l'application
+        run: |
+          echo "📦 Build de l'application Spring Boot..."
+          mvn package -DskipTests -B
+          
+          echo "📋 Informations sur l'artefact généré:"
+          ls -la target/*.jar
+          
+          echo "✅ Build terminé avec succès"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 7: Upload des artefacts pour les jobs suivants
+      # ----------------------------------------------------------------------
+      - name: 📤 Upload de l'artefact JAR
+        uses: actions/upload-artifact@v3
+        with:
+          name: vibe-tickets-jar
+          path: target/*.jar
+          retention-days: 1
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 8: Upload des rapports de tests
+      # ----------------------------------------------------------------------
+      - name: 📊 Upload des rapports de tests
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+          retention-days: 7
+
+  # ==========================================================================
+  # JOB 2: BUILD ET PUSH DOCKER (CI)
+  # ==========================================================================
+  docker-build:
+    name: 🐳 Build Docker
+    runs-on: ubuntu-latest
+    needs: test-and-build
+    
+    # Variables spécifiques à ce job
+    env:
+      IMAGE_TAG: v$(date +%Y%m%d-%H%M%S)
+    
+    outputs:
+      # Exposer le tag de l'image pour les jobs suivants
+      image-tag: ${{ steps.generate-tag.outputs.tag }}
+      ecr-uri: ${{ steps.generate-tag.outputs.ecr-uri }}
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code et des artefacts
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+
+      - name: 📥 Download de l'artefact JAR
+        uses: actions/download-artifact@v3
+        with:
+          name: vibe-tickets-jar
+          path: target/
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Génération du tag avec timestamp
+      # ----------------------------------------------------------------------
+      - name: 🏷️ Génération du tag Docker
+        id: generate-tag
+        run: |
+          # Génération du timestamp au format utilisé par le projet
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          IMAGE_TAG="v${TIMESTAMP}"
+          
+          # Construction de l'URI ECR complète
+          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}"
+          
+          echo "🏷️ Tag généré: ${IMAGE_TAG}"
+          echo "🏷️ URI ECR: ${ECR_URI}"
+          
+          # Export des variables pour les étapes suivantes
+          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "ecr-uri=${ECR_URI}" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Configuration de Docker Buildx
+      # ----------------------------------------------------------------------
+      - name: 🔧 Configuration de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          # Utiliser le driver docker-container pour les fonctionnalités avancées
+          driver: docker-container
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Build de l'image Docker
+      # ----------------------------------------------------------------------
+      - name: 🐳 Build de l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: |
+            vibe-tickets:${{ steps.generate-tag.outputs.tag }}
+            vibe-tickets:latest
+          # Optimisations pour le cache
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Build multi-plateforme si nécessaire
+          platforms: linux/amd64
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 5: Tests de sécurité de l'image Docker
+      # ----------------------------------------------------------------------
+      - name: 🔒 Scan de sécurité de l'image Docker
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: vibe-tickets:${{ steps.generate-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📤 Upload des résultats de sécurité
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ==========================================================================
+  # JOB 3: DÉPLOIEMENT AWS (CD) - UNIQUEMENT SUR MAIN
+  # ==========================================================================
+  deploy-aws:
+    name: 🚀 Déploiement AWS
+    runs-on: ubuntu-latest
+    needs: [test-and-build, docker-build]
+
+    # Exécuter uniquement sur la branche main et si ce n'est pas une PR
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+
+    # Définir l'environnement pour les secrets et protections
+    environment:
+      name: ${{ inputs.environment || 'dev' }}
+      url: http://${{ steps.deploy.outputs.ec2-ip }}:8080
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code source
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Configuration des credentials AWS
+      # ----------------------------------------------------------------------
+      - name: 🔐 Configuration des credentials AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          # Masquer les credentials dans les logs
+          mask-aws-account-id: true
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Vérification des permissions AWS
+      # ----------------------------------------------------------------------
+      - name: ✅ Vérification des permissions AWS
+        run: |
+          echo "🔍 Vérification de l'identité AWS..."
+          aws sts get-caller-identity
+
+          echo "🔍 Vérification de l'accès ECR..."
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || {
+            echo "❌ Repository ECR non trouvé ou permissions insuffisantes"
+            exit 1
+          }
+
+          echo "✅ Permissions AWS validées"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Authentification Docker vers ECR
+      # ----------------------------------------------------------------------
+      - name: 🐳 Authentification Docker vers ECR
+        run: |
+          echo "🔐 Authentification vers ECR..."
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+          echo "✅ Authentification ECR réussie"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 5: Reconstruction et push de l'image Docker
+      # ----------------------------------------------------------------------
+      - name: 📥 Download de l'artefact JAR
+        uses: actions/download-artifact@v3
+        with:
+          name: vibe-tickets-jar
+          path: target/
+
+      - name: 🐳 Build et Push vers ECR
+        run: |
+          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
+          ECR_URI="${{ needs.docker-build.outputs.ecr-uri }}"
+
+          echo "🏗️ Build de l'image Docker pour ECR..."
+          docker build -t vibe-tickets:${IMAGE_TAG} .
+
+          echo "🏷️ Tag de l'image pour ECR..."
+          docker tag vibe-tickets:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
+          docker tag vibe-tickets:${IMAGE_TAG} ${ECR_URI}:latest
+
+          echo "📤 Push vers ECR..."
+          docker push ${ECR_URI}:${IMAGE_TAG}
+          docker push ${ECR_URI}:latest
+
+          echo "✅ Image pushée avec succès vers ECR"
+          echo "📋 Tag utilisé: ${IMAGE_TAG}"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 6: Installation et configuration de Terraform
+      # ----------------------------------------------------------------------
+      - name: 🏗️ Installation de Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          # Permettre l'accès aux outputs Terraform
+          terraform_wrapper: false
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 7: Génération des clés SSH pour EC2
+      # ----------------------------------------------------------------------
+      - name: 🔑 Génération des clés SSH
+        run: |
+          echo "🔑 Génération des clés SSH pour EC2..."
+
+          # Génération du nom de clé avec timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          SSH_KEY_NAME="vibe-tickets-key-${TIMESTAMP}"
+
+          # Génération de la paire de clés
+          ssh-keygen -t rsa -b 4096 -f terraform/ssh-key -N "" -C "vibe-tickets-${TIMESTAMP}"
+
+          # Permissions correctes pour la clé privée
+          chmod 600 terraform/ssh-key
+          chmod 644 terraform/ssh-key.pub
+
+          echo "✅ Clés SSH générées: ${SSH_KEY_NAME}"
+          echo "SSH_KEY_NAME=${SSH_KEY_NAME}" >> $GITHUB_ENV
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 8: Mise à jour des variables Terraform
+      # ----------------------------------------------------------------------
+      - name: 📝 Mise à jour des variables Terraform
+        run: |
+          cd terraform
+
+          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
+
+          echo "📝 Mise à jour de terraform.tfvars..."
+
+          # Mise à jour du tag d'image
+          sed -i "s/^image_tag = .*/image_tag = \"${IMAGE_TAG}\"/" terraform.tfvars
+
+          # Mise à jour du nom de clé SSH
+          sed -i "s/^ec2_key_name = .*/ec2_key_name = \"${SSH_KEY_NAME}\"/" terraform.tfvars
+
+          echo "📋 Variables Terraform mises à jour:"
+          grep -E "^(image_tag|ec2_key_name)" terraform.tfvars
+
+          echo "✅ Variables Terraform configurées"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 9: Déploiement avec Terraform
+      # ----------------------------------------------------------------------
+      - name: 🚀 Initialisation de Terraform
+        run: |
+          cd terraform
+          echo "🔧 Initialisation de Terraform..."
+          terraform init
+
+          echo "📋 Validation de la configuration..."
+          terraform validate
+
+          echo "✅ Terraform initialisé et validé"
+
+      - name: 📋 Plan Terraform
+        run: |
+          cd terraform
+          echo "📋 Génération du plan de déploiement..."
+          terraform plan -detailed-exitcode
+
+          echo "✅ Plan Terraform généré"
+
+      - name: 🚀 Application Terraform
+        id: deploy
+        run: |
+          cd terraform
+          echo "🚀 Déploiement de l'infrastructure..."
+          terraform apply -auto-approve
+
+          # Récupération des outputs importants
+          EC2_IP=$(terraform output -raw ec2_public_ip)
+          RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+
+          echo "✅ Déploiement Terraform terminé"
+          echo "📋 Informations de déploiement:"
+          echo "   - IP EC2: ${EC2_IP}"
+          echo "   - RDS Endpoint: ${RDS_ENDPOINT}"
+          echo "   - ECR URL: ${ECR_URL}"
+
+          # Export des outputs pour les étapes suivantes
+          echo "ec2-ip=${EC2_IP}" >> $GITHUB_OUTPUT
+          echo "rds-endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 10: Health Checks et validation du déploiement
+      # ----------------------------------------------------------------------
+      - name: 🏥 Health Checks de l'application
+        run: |
+          EC2_IP="${{ steps.deploy.outputs.ec2-ip }}"
+          APP_URL="http://${EC2_IP}:8080"
+
+          echo "🏥 Vérification de la santé de l'application..."
+          echo "📍 URL de l'application: ${APP_URL}"
+
+          # Attendre que l'application démarre (max 5 minutes)
+          echo "⏳ Attente du démarrage de l'application..."
+          for i in {1..30}; do
+            if curl -f -s "${APP_URL}/actuator/health" > /dev/null; then
+              echo "✅ Application démarrée avec succès (tentative ${i})"
+              break
+            fi
+
+            if [ $i -eq 30 ]; then
+              echo "❌ Timeout: L'application n'a pas démarré dans les temps"
+              exit 1
+            fi
+
+            echo "⏳ Tentative ${i}/30 - En attente..."
+            sleep 10
+          done
+
+          # Vérification détaillée de la santé
+          echo "🔍 Vérification détaillée de la santé..."
+          HEALTH_RESPONSE=$(curl -s "${APP_URL}/actuator/health")
+          echo "📋 Réponse health check: ${HEALTH_RESPONSE}"
+
+          # Vérification que la base de données est connectée
+          if echo "${HEALTH_RESPONSE}" | grep -q '"status":"UP"'; then
+            echo "✅ Application en bonne santé"
+          else
+            echo "❌ Application en mauvaise santé"
+            exit 1
+          fi
+
+          # Test des endpoints principaux
+          echo "🧪 Test des endpoints principaux..."
+
+          # Test de l'endpoint des offres
+          if curl -f -s "${APP_URL}/api/offers" > /dev/null; then
+            echo "✅ Endpoint /api/offers accessible"
+          else
+            echo "⚠️ Endpoint /api/offers non accessible"
+          fi
+
+          echo "✅ Tous les health checks sont passés"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 11: Nettoyage des ressources temporaires
+      # ----------------------------------------------------------------------
+      - name: 🧹 Nettoyage des ressources temporaires
+        if: always()
+        run: |
+          echo "🧹 Nettoyage des clés SSH temporaires..."
+          rm -f terraform/ssh-key terraform/ssh-key.pub
+
+          echo "🧹 Nettoyage des images Docker locales..."
+          docker system prune -f
+
+          echo "✅ Nettoyage terminé"
+
+  # ==========================================================================
+  # JOB 4: NOTIFICATION ET RAPPORT DE DÉPLOIEMENT
+  # ==========================================================================
+  notify-deployment:
+    name: 📢 Notification de déploiement
+    runs-on: ubuntu-latest
+    needs: [test-and-build, docker-build, deploy-aws]
+    if: always() && github.ref == 'refs/heads/main'
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Préparation du rapport de déploiement
+      # ----------------------------------------------------------------------
+      - name: 📊 Préparation du rapport de déploiement
+        id: report
+        run: |
+          # Détermination du statut global
+          if [[ "${{ needs.test-and-build.result }}" == "success" &&
+                "${{ needs.docker-build.result }}" == "success" &&
+                "${{ needs.deploy-aws.result }}" == "success" ]]; then
+            STATUS="✅ SUCCÈS"
+            COLOR="good"
+          else
+            STATUS="❌ ÉCHEC"
+            COLOR="danger"
+          fi
+
+          # Informations sur le déploiement
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          AUTHOR="${{ github.event.head_commit.author.name }}"
+          IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
+
+          echo "status=${STATUS}" >> $GITHUB_OUTPUT
+          echo "color=${COLOR}" >> $GITHUB_OUTPUT
+          echo "commit-sha=${COMMIT_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "commit-msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
+          echo "author=${AUTHOR}" >> $GITHUB_OUTPUT
+          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Création du résumé GitHub
+      # ----------------------------------------------------------------------
+      - name: 📋 Résumé de déploiement GitHub
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # 🚀 Rapport de Déploiement Vibe-Tickets Backend
+
+          ## 📊 Statut Global
+          **${{ steps.report.outputs.status }}**
+
+          ## 📋 Informations de Déploiement
+          - **Commit**: \`${{ steps.report.outputs.commit-sha }}\`
+          - **Auteur**: ${{ steps.report.outputs.author }}
+          - **Message**: ${{ steps.report.outputs.commit-msg }}
+          - **Tag Docker**: \`${{ steps.report.outputs.image-tag }}\`
+          - **Environnement**: ${{ inputs.environment || 'dev' }}
+
+          ## 🔍 Détail des Jobs
+          | Job | Statut | Durée |
+          |-----|--------|-------|
+          | Tests et Build | ${{ needs.test-and-build.result == 'success' && '✅' || '❌' }} | - |
+          | Docker Build | ${{ needs.docker-build.result == 'success' && '✅' || '❌' }} | - |
+          | Déploiement AWS | ${{ needs.deploy-aws.result == 'success' && '✅' || '❌' }} | - |
+
+          ## 🔗 Liens Utiles
+          - **Application**: http://${{ needs.deploy-aws.outputs.ec2-ip }}:8080
+          - **Health Check**: http://${{ needs.deploy-aws.outputs.ec2-ip }}:8080/actuator/health
+          - **API Offers**: http://${{ needs.deploy-aws.outputs.ec2-ip }}:8080/api/offers
+
+          ---
+          *Déploiement automatisé via GitHub Actions*
+          EOF
+
+# ============================================================================
+# CONFIGURATION DES PERMISSIONS
+# ============================================================================
+permissions:
+  # Permissions nécessaires pour le pipeline
+  contents: read          # Lecture du code source
+  packages: write         # Écriture dans GitHub Packages (si utilisé)
+  security-events: write  # Upload des résultats de sécurité
+  id-token: write        # Pour l'authentification OIDC (optionnel)
+  actions: read          # Lecture des actions et workflows
