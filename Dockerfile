@@ -13,6 +13,9 @@ COPY pom.xml .
 COPY .mvn/ .mvn/
 COPY mvnw mvnw.cmd ./
 
+# Donner les permissions d'execution au wrapper Maven
+RUN chmod +x ./mvnw
+
 # Telecharger les dependances (mise en cache Docker)
 RUN ./mvnw dependency:go-offline -B
 
