@@ -85,7 +85,29 @@ aws configure
 
 ## 🚀 Déploiement
 
-### 1. Configuration initiale
+### 1. Déploiement automatisé avec GitHub Actions (Recommandé)
+
+Le projet utilise des pipelines GitHub Actions pour un déploiement entièrement automatisé :
+
+```bash
+# Déploiement automatique sur push vers main
+git add .
+git commit -m "feat: nouvelle fonctionnalité"
+git push origin main
+```
+
+**Fonctionnalités du pipeline CI/CD :**
+- ✅ Tests automatiques (unitaires + intégration)
+- ✅ Build Maven et création d'image Docker
+- ✅ Scan de sécurité des images
+- ✅ Push automatique vers Amazon ECR
+- ✅ Déploiement Terraform automatisé
+- ✅ Health checks post-déploiement
+- ✅ Notifications de statut
+
+📖 **[Guide complet GitHub Actions](docs/GITHUB_ACTIONS_SETUP.md)**
+
+### 2. Déploiement manuel (Développement local)
 
 ```bash
 # Cloner le repository
@@ -96,8 +118,6 @@ cd vibe-tickets
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Éditer terraform.tfvars avec vos valeurs
 ```
-
-### 2. Déploiement automatisé
 
 ```powershell
 # Déploiement complet (recommandé)
@@ -116,6 +136,13 @@ Le script affiche automatiquement :
 - ✅ URL de l'application
 - ✅ Commandes SSH pour le debug
 - ✅ Identifiants de test
+
+### 4. Health Check automatisé
+
+```bash
+# Vérification de la santé de l'application
+./scripts/ci/health-check.sh http://13.36.187.182:8080
+```
 
 ## 🔧 Configuration
 
@@ -148,6 +175,32 @@ Le script `deploy.ps1` configure automatiquement :
 - `CORS_ORIGINS`
 - `JWT_SECRET`
 - `SPRING_PROFILES_ACTIVE=docker`
+
+## 🔄 Pipelines CI/CD
+
+### GitHub Actions
+
+Le projet utilise des pipelines GitHub Actions pour l'automatisation complète :
+
+#### 🚀 Pipeline Principal (`backend-ci-cd.yml`)
+- **Déclencheurs** : Push sur `main`, workflow manuel
+- **Étapes** : Tests → Build → Docker → Deploy AWS → Health Checks
+- **Environnements** : dev, staging, prod
+- **Notifications** : Rapports automatiques de déploiement
+
+#### 🔍 Pipeline PR (`backend-pr.yml`)
+- **Déclencheurs** : Pull Requests vers `main`
+- **Étapes** : Validation → Tests → Docker Build
+- **Feedback** : Commentaires automatiques sur les PR
+
+### Monitoring et Qualité
+
+- **Tests automatiques** : Unitaires + Intégration avec PostgreSQL
+- **Couverture de code** : Rapports JaCoCo automatiques
+- **Sécurité** : Scan Trivy des images Docker
+- **Performance** : Health checks et métriques de réponse
+
+📖 **[Configuration complète des pipelines](docs/GITHUB_ACTIONS_SETUP.md)**
 
 ## 🧪 Tests
 
@@ -222,6 +275,10 @@ systemctl status docker
 
 ```
 vibe-tickets/
+├── .github/                     # GitHub Actions CI/CD
+│   └── workflows/              # Pipelines automatisés
+│       ├── backend-ci-cd.yml  # Pipeline principal (main)
+│       └── backend-pr.yml     # Validation Pull Requests
 ├── src/                          # Code source Spring Boot
 │   ├── main/java/               # Code Java
 │   └── main/resources/          # Configuration
@@ -231,6 +288,8 @@ vibe-tickets/
 │   ├── outputs.tf              # Outputs
 │   └── terraform.tfvars        # Variables personnalisées
 ├── scripts/                     # Scripts d'automatisation
+│   ├── ci/                     # Scripts CI/CD
+│   │   └── health-check.sh    # Vérification santé application
 │   ├── deployment/             # Scripts de déploiement
 │   │   ├── deploy.ps1         # Script principal de déploiement
 │   │   └── user-data.sh       # Script d'initialisation EC2

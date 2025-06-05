@@ -1,0 +1,389 @@
+# ============================================================================
+# PIPELINE CI GITHUB ACTIONS - PULL REQUESTS BACKEND VIBE-TICKETS
+# ============================================================================
+#
+# Ce pipeline s'exécute sur les Pull Requests pour valider les changements
+# avant leur intégration dans la branche principale.
+#
+# OBJECTIFS :
+# - Validation rapide des changements proposés
+# - Tests de non-régression
+# - Vérification de la qualité du code
+# - Build et tests Docker sans déploiement
+# - Feedback rapide aux développeurs
+#
+# DIFFÉRENCES AVEC LE PIPELINE PRINCIPAL :
+# - Pas de déploiement AWS
+# - Pas de push vers ECR
+# - Focus sur la validation et les tests
+# - Exécution plus rapide
+#
+# ============================================================================
+
+name: 🔍 Backend PR Validation
+
+# ============================================================================
+# CONFIGURATION DES DÉCLENCHEURS
+# ============================================================================
+on:
+  # Déclenchement sur Pull Requests vers main
+  pull_request:
+    branches: 
+      - main
+      - develop
+    # Filtrer uniquement les changements affectant le backend
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'Dockerfile'
+      - '.github/workflows/backend-*.yml'
+
+  # Déclenchement sur les mises à jour de PR
+  pull_request_target:
+    types: [synchronize, reopened]
+    branches: 
+      - main
+      - develop
+
+# ============================================================================
+# VARIABLES D'ENVIRONNEMENT
+# ============================================================================
+env:
+  # Configuration Java et Maven
+  JAVA_VERSION: '21'
+  MAVEN_OPTS: '-Xmx1024m -XX:MaxPermSize=256m'
+  
+  # Configuration Docker
+  DOCKER_BUILDKIT: 1
+
+# ============================================================================
+# DÉFINITION DES JOBS
+# ============================================================================
+jobs:
+  # ==========================================================================
+  # JOB 1: VALIDATION RAPIDE DU CODE
+  # ==========================================================================
+  quick-validation:
+    name: ⚡ Validation Rapide
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code source
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+        with:
+          # Pour les PR externes, utiliser le code de la PR
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Configuration de Java
+      # ----------------------------------------------------------------------
+      - name: ☕ Configuration de Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'eclipse-temurin'
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Cache Maven
+      # ----------------------------------------------------------------------
+      - name: 📦 Cache des dépendances Maven
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-pr-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-pr-
+            ${{ runner.os }}-maven-
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Validation et compilation rapide
+      # ----------------------------------------------------------------------
+      - name: 🔍 Validation du projet
+        run: |
+          echo "🔍 Validation de la structure du projet..."
+          mvn validate -q
+          
+          echo "🏗️ Compilation rapide..."
+          mvn compile -B -q
+          
+          echo "✅ Validation et compilation réussies"
+
+  # ==========================================================================
+  # JOB 2: TESTS COMPLETS
+  # ==========================================================================
+  comprehensive-tests:
+    name: 🧪 Tests Complets
+    runs-on: ubuntu-latest
+    needs: quick-validation
+    
+    # Configuration des services pour les tests
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: vibe_tickets_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code source
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Configuration de Java
+      # ----------------------------------------------------------------------
+      - name: ☕ Configuration de Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'eclipse-temurin'
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Cache Maven
+      # ----------------------------------------------------------------------
+      - name: 📦 Cache des dépendances Maven
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-pr-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-pr-
+            ${{ runner.os }}-maven-
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Exécution des tests
+      # ----------------------------------------------------------------------
+      - name: 🧪 Tests unitaires et d'intégration
+        run: |
+          echo "🧪 Exécution de tous les tests..."
+          mvn clean test -B
+          
+          echo "📊 Génération du rapport de couverture..."
+          mvn jacoco:report
+          
+          echo "✅ Tests terminés avec succès"
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/vibe_tickets_test
+          SPRING_DATASOURCE_USERNAME: test_user
+          SPRING_DATASOURCE_PASSWORD: test_password
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 5: Analyse de la couverture de code
+      # ----------------------------------------------------------------------
+      - name: 📊 Analyse de la couverture de code
+        run: |
+          echo "📊 Analyse de la couverture de code..."
+          
+          # Vérification que le rapport existe
+          if [ -f "target/site/jacoco/index.html" ]; then
+            echo "✅ Rapport de couverture généré"
+            
+            # Extraction des métriques de couverture (si possible)
+            if command -v xmllint &> /dev/null && [ -f "target/site/jacoco/jacoco.xml" ]; then
+              COVERAGE=$(xmllint --xpath "string(//report/counter[@type='INSTRUCTION']/@covered)" target/site/jacoco/jacoco.xml 2>/dev/null || echo "N/A")
+              TOTAL=$(xmllint --xpath "string(//report/counter[@type='INSTRUCTION']/@missed)" target/site/jacoco/jacoco.xml 2>/dev/null || echo "N/A")
+              
+              if [[ "$COVERAGE" != "N/A" && "$TOTAL" != "N/A" ]]; then
+                PERCENTAGE=$(echo "scale=2; $COVERAGE / ($COVERAGE + $TOTAL) * 100" | bc -l 2>/dev/null || echo "N/A")
+                echo "📊 Couverture de code: ${PERCENTAGE}%"
+              fi
+            fi
+          else
+            echo "⚠️ Rapport de couverture non trouvé"
+          fi
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 6: Upload des rapports de tests
+      # ----------------------------------------------------------------------
+      - name: 📤 Upload des rapports de tests
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: pr-test-reports-${{ github.event.pull_request.number }}
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+          retention-days: 7
+
+  # ==========================================================================
+  # JOB 3: BUILD ET VALIDATION DOCKER
+  # ==========================================================================
+  docker-validation:
+    name: 🐳 Validation Docker
+    runs-on: ubuntu-latest
+    needs: quick-validation
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Récupération du code source
+      # ----------------------------------------------------------------------
+      - name: 📥 Checkout du code source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Configuration de Java pour le build
+      # ----------------------------------------------------------------------
+      - name: ☕ Configuration de Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'eclipse-temurin'
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 3: Build de l'application
+      # ----------------------------------------------------------------------
+      - name: 📦 Build de l'application
+        run: |
+          echo "📦 Build de l'application pour Docker..."
+          mvn clean package -DskipTests -B -q
+          
+          echo "✅ Build terminé"
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 4: Configuration de Docker Buildx
+      # ----------------------------------------------------------------------
+      - name: 🔧 Configuration de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 5: Build et test de l'image Docker
+      # ----------------------------------------------------------------------
+      - name: 🐳 Build et test de l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: vibe-tickets:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 6: Test de l'image Docker
+      # ----------------------------------------------------------------------
+      - name: 🧪 Test de l'image Docker
+        run: |
+          echo "🧪 Test de l'image Docker..."
+          
+          # Démarrage du conteneur en mode test
+          docker run -d --name test-container \
+            -e SPRING_PROFILES_ACTIVE=test \
+            -p 8080:8080 \
+            vibe-tickets:pr-${{ github.event.pull_request.number }}
+          
+          # Attendre que l'application démarre
+          echo "⏳ Attente du démarrage de l'application..."
+          for i in {1..12}; do
+            if docker exec test-container curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+              echo "✅ Application démarrée dans le conteneur"
+              break
+            fi
+            
+            if [ $i -eq 12 ]; then
+              echo "❌ L'application n'a pas démarré dans les temps"
+              docker logs test-container
+              exit 1
+            fi
+            
+            sleep 5
+          done
+          
+          # Nettoyage
+          docker stop test-container
+          docker rm test-container
+          
+          echo "✅ Test Docker réussi"
+
+  # ==========================================================================
+  # JOB 4: COMMENTAIRE DE RÉSUMÉ SUR LA PR
+  # ==========================================================================
+  pr-comment:
+    name: 💬 Commentaire PR
+    runs-on: ubuntu-latest
+    needs: [quick-validation, comprehensive-tests, docker-validation]
+    if: always()
+
+    steps:
+      # ----------------------------------------------------------------------
+      # ÉTAPE 1: Préparation du commentaire
+      # ----------------------------------------------------------------------
+      - name: 📝 Préparation du commentaire PR
+        id: comment
+        run: |
+          # Détermination du statut global
+          if [[ "${{ needs.quick-validation.result }}" == "success" && 
+                "${{ needs.comprehensive-tests.result }}" == "success" && 
+                "${{ needs.docker-validation.result }}" == "success" ]]; then
+            STATUS="✅ Tous les checks sont passés"
+            EMOJI="🎉"
+          else
+            STATUS="❌ Certains checks ont échoué"
+            EMOJI="⚠️"
+          fi
+          
+          # Construction du commentaire
+          cat > comment.md << EOF
+          ## ${EMOJI} Résultat de la validation PR #${{ github.event.pull_request.number }}
+          
+          **Statut global**: ${STATUS}
+          
+          ### 📊 Détail des validations
+          
+          | Check | Statut | Description |
+          |-------|--------|-------------|
+          | Validation rapide | ${{ needs.quick-validation.result == 'success' && '✅ Succès' || '❌ Échec' }} | Compilation et validation de base |
+          | Tests complets | ${{ needs.comprehensive-tests.result == 'success' && '✅ Succès' || '❌ Échec' }} | Tests unitaires et d'intégration |
+          | Validation Docker | ${{ needs.docker-validation.result == 'success' && '✅ Succès' || '❌ Échec' }} | Build et test de l'image Docker |
+          
+          ### 🔗 Liens utiles
+          - [Détails du workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Rapports de tests](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)
+          
+          ---
+          *Validation automatique via GitHub Actions*
+          EOF
+          
+          echo "comment-file=comment.md" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------------------
+      # ÉTAPE 2: Publication du commentaire
+      # ----------------------------------------------------------------------
+      - name: 💬 Publication du commentaire PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('${{ steps.comment.outputs.comment-file }}', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+# ============================================================================
+# CONFIGURATION DES PERMISSIONS
+# ============================================================================
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
