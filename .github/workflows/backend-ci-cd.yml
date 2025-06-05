@@ -90,7 +90,7 @@ env:
   ECR_REPOSITORY: vibe-tickets
   
   # Configuration Java et Maven
-  JAVA_VERSION: '21'
+  JAVA_VERSION: '23'
   MAVEN_OPTS: '-Xmx1024m -XX:MetaspaceSize=256m'
   
   # Configuration Docker

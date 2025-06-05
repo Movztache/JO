@@ -3,7 +3,7 @@
 # ================================
 
 # Stage 1: Build de l'application
-FROM maven:3.9.9-eclipse-temurin-21 AS builder
+FROM maven:3.9.9-eclipse-temurin-23 AS builder
 
 # Definir le repertoire de travail
 WORKDIR /app
@@ -23,7 +23,7 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests -B
 
 # Stage 2: Runtime optimise
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:23-jre-alpine
 
 # Metadonnees de l'image
 LABEL maintainer="votre-email@example.com"
