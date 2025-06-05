@@ -412,27 +412,8 @@ jobs:
           cd terraform
           echo "Generation du plan de deploiement..."
 
-          # Executer terraform plan et capturer le code de sortie
-          terraform plan -detailed-exitcode
-          PLAN_EXIT_CODE=$?
-
-          # Interpreter le code de sortie
-          case $PLAN_EXIT_CODE in
-            0)
-              echo "Aucun changement detecte"
-              ;;
-            1)
-              echo "Erreur dans le plan Terraform"
-              exit 1
-              ;;
-            2)
-              echo "Changements detectes - deploiement necessaire"
-              ;;
-            *)
-              echo "Code de sortie inattendu: $PLAN_EXIT_CODE"
-              exit 1
-              ;;
-          esac
+          # Executer terraform plan sans -detailed-exitcode pour eviter les problemes
+          terraform plan
 
           echo "Plan Terraform genere avec succes"
 
