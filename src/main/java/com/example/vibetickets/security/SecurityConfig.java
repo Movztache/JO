@@ -67,8 +67,10 @@ public class SecurityConfig {
 
                 // Configuration des règles d'autorisation pour différents chemins d'URL
                 .authorizeHttpRequests(authorize -> authorize
+                        // PRIORITÉ ABSOLUE: Routes d'authentification DOIVENT être accessibles sans auth
+                        .requestMatchers("/api/authentication/**").permitAll()
                         // Routes publiques accessibles sans authentification
-                        .requestMatchers("/", "/home", "/offers/**", "/register", "/api/auth/**", "/api/offers","/api/cart/**").permitAll()
+                        .requestMatchers("/", "/home", "/offers/**", "/register", "/api/offers/**","/api/cart/**").permitAll()
                         // Permettre l'accès aux pages d'erreur pour tous les utilisateurs
                         .requestMatchers("/error", "/error/**").permitAll()
                         // Routes nécessitant une authentification
@@ -79,8 +81,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/utilisateurs/**").authenticated()
                         // Routes nécessitant un rôle spécifique
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        // Configuration par défaut pour les autres routes
-                        .anyRequest().authenticated()
+                         .anyRequest().authenticated()
                 )
 
                 // Gestion des exceptions de sécurité avec des gestionnaires personnalisés
@@ -126,10 +127,13 @@ public class SecurityConfig {
         String corsOriginsStr = environment.getProperty("cors.allowed.origins", "http://localhost:4200");
         List<String> corsOrigins = Arrays.asList(corsOriginsStr.split(","));
 
+        // Configuration CORS
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedOrigins(corsOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

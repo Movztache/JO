@@ -103,12 +103,18 @@ variable "ecr_repository_name" {
   default     = "vibe-tickets"
 }
 
+variable "image_tag" {
+  description = "Docker image tag to deploy (format: v20241202-143055)"
+  type        = string
+  default     = "latest"  # Sera remplacé par le script de déploiement avec timestamp
+}
+
 # ============================================================================
 # FRONTEND VARIABLES
 # ============================================================================
 
 variable "frontend_url" {
-  description = "URL of the frontend application (CloudFront)"
+  description = "URL of the frontend application (CloudFront HTTP)"
   type        = string
-  default     = "https://d2rp6qs91n8yy7.cloudfront.net"
+  default     = "http://d3o32gj1vfio9o.cloudfront.net"
 }

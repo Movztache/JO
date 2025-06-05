@@ -97,7 +97,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // Utiliser la méthode debug avec un seul paramètre de message
         logger.debug("Chemin de la requête: " + path);
 
-        boolean shouldSkip = path.startsWith("/api/auth/") ||
+        boolean shouldSkip = path.startsWith("/api/authentication/") ||
                 path.equals("/") ||
                 path.equals("/login") ||
                 path.startsWith("/home") ||

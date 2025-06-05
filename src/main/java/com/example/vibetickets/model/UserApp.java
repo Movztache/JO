@@ -28,6 +28,7 @@ public class UserApp {
     @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")
     @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!*()_]).*$",
             message = "Le mot de passe doit contenir au moins un chiffre, une minuscule, une majuscule et un caractère spécial")
+    @Column(length = 200) // Longueur augmentée pour éviter toute troncature
     private String password;
 
     @NotBlank(message = "L'email est obligatoire")

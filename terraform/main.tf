@@ -1,40 +1,76 @@
 # ============================================================================
-# TERRAFORM CONFIGURATION FOR VIBE-TICKETS APPLICATION
+# INFRASTRUCTURE TERRAFORM - APPLICATION VIBE-TICKETS
 # ============================================================================
 #
-# Ce fichier contient la configuration complète de l'infrastructure AWS :
-# - VPC avec subnets publics/privés multi-AZ
-# - Instance EC2 avec rôles IAM sécurisés
-# - Base de données RDS PostgreSQL
-# - Repository ECR pour les images Docker
-# - Security Groups pour la sécurité réseau
+# Ce fichier définit l'infrastructure complète AWS pour l'application Vibe-Tickets :
 #
-# Déploiement automatique complet avec bonnes pratiques entreprise
+# ARCHITECTURE :
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                            INFRASTRUCTURE AWS                           │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ VPC (10.0.0.0/16)                                                      │
+# │ ├── Subnets Publics (Multi-AZ)  : Instance EC2 + Load Balancer         │
+# │ ├── Subnets Privés (Multi-AZ)   : Base de données RDS                  │
+# │ ├── Internet Gateway            : Accès Internet                       │
+# │ └── NAT Gateway                 : Accès sortant pour subnets privés    │
+# │                                                                         │
+# │ SERVICES :                                                              │
+# │ ├── EC2 Instance (Amazon Linux) : Application Spring Boot + Docker     │
+# │ ├── RDS PostgreSQL              : Base de données                      │
+# │ ├── ECR Repository              : Images Docker                        │
+# │ ├── Elastic IP                  : IP publique stable                   │
+# │ └── IAM Roles                   : Permissions sécurisées               │
+# │                                                                         │
+# │ SÉCURITÉ :                                                              │
+# │ ├── Security Groups             : Contrôle d'accès réseau              │
+# │ ├── Clés SSH dynamiques         : Générées à chaque déploiement        │
+# │ ├── Chiffrement                 : EBS + RDS chiffrés                   │
+# │ └── Principe du moindre privilège : IAM policies restrictives          │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# PRÉREQUIS :
+# - AWS CLI configuré avec les bonnes permissions
+# - Fichier terraform.tfvars avec les variables personnalisées
+# - Clés SSH générées par le script deploy.ps1
+#
+# DÉPLOIEMENT :
+# - Utiliser le script deploy.ps1 pour un déploiement automatisé complet
+# - Ne pas exécuter terraform directement (gestion des clés SSH requise)
+#
 # ============================================================================
 
 # ============================================================================
-# DATA SOURCES
+# DATA SOURCES - RÉCUPÉRATION D'INFORMATIONS AWS
 # ============================================================================
 
-# Get latest Amazon Linux 2023 AMI
+# Récupération de la dernière AMI Amazon Linux 2023
+# Cette AMI est utilisée pour l'instance EC2 qui hébergera l'application
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
 
+  # Filtrer pour obtenir Amazon Linux 2023
   filter {
     name   = "name"
     values = ["al2023-ami-*"]
   }
 
+  # Architecture x86_64 (compatible avec la plupart des instances)
   filter {
     name   = "architecture"
     values = ["x86_64"]
   }
 
+  # Seulement les AMIs disponibles
   filter {
     name   = "state"
     values = ["available"]
   }
+}
+
+# Récupération des zones de disponibilité de la région
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
 # Get current AWS account ID
@@ -169,6 +205,15 @@ resource "aws_security_group" "rds" {
     description     = "PostgreSQL access from EC2"
   }
 
+  # PostgreSQL access from your IP (for testing)
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["${var.my_ip}/32"]
+    description = "PostgreSQL access from my IP for testing"
+  }
+
   # All outbound traffic
   egress {
     from_port   = 0
@@ -184,7 +229,24 @@ resource "aws_security_group" "rds" {
 }
 
 # ============================================================================
-# KEY PAIR
+# CLÉS SSH POUR L'ACCÈS EC2
+# ============================================================================
+#
+# SÉCURITÉ DES CLÉS SSH :
+# - Les clés SSH sont générées automatiquement par le script deploy.ps1
+# - Chaque déploiement utilise une nouvelle paire de clés avec timestamp
+# - Les anciennes clés sont automatiquement supprimées
+# - La clé privée n'est jamais commitée dans Git
+#
+# PROCESSUS :
+# 1. deploy.ps1 génère ssh-key et ssh-key.pub dans terraform/
+# 2. Terraform utilise ssh-key.pub pour créer la key pair AWS
+# 3. L'instance EC2 est configurée avec cette clé
+# 4. Connexion SSH possible avec : ssh -i terraform/ssh-key ec2-user@<IP>
+#
+# IMPORTANT :
+# - Ne jamais exécuter terraform directement sans passer par deploy.ps1
+# - Les fichiers ssh-key* sont dans .gitignore pour la sécurité
 # ============================================================================
 
 resource "aws_key_pair" "main" {
@@ -192,7 +254,14 @@ resource "aws_key_pair" "main" {
   public_key = file("${path.module}/ssh-key.pub")
 
   tags = {
-    Name = "${var.project_name}-key-pair"
+    Name        = "${var.project_name}-key-pair"
+    Description = "Clé SSH générée automatiquement pour ${var.ec2_key_name}"
+    CreatedBy   = "deploy.ps1"
+  }
+
+  # Lifecycle pour éviter les conflits lors des redéploiements
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -235,7 +304,7 @@ resource "aws_db_instance" "main" {
 
   # Engine configuration
   engine         = "postgres"
-  engine_version = "15.7"
+  engine_version = "15.12"  # Version actuelle de la base existante
   instance_class = var.db_instance_class
 
   # Storage configuration
@@ -252,7 +321,7 @@ resource "aws_db_instance" "main" {
   # Network configuration
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = false
+  publicly_accessible    = true  # Accessible publiquement pour les tests
 
   # Backup configuration
   backup_retention_period = 7
@@ -334,9 +403,9 @@ resource "aws_iam_instance_profile" "ec2" {
 
 locals {
   # Unique hash to force user-data update on every apply
-  deployment_hash = sha256("${timestamp()}-${filesha256("${path.module}/user-data.sh")}")
+  deployment_hash = sha256("${timestamp()}-${filesha256("${path.module}/../scripts/deployment/user-data.sh")}")
 
-  user_data = base64encode(templatefile("${path.module}/user-data.sh", {
+  user_data = base64encode(templatefile("${path.module}/../scripts/deployment/user-data.sh", {
     ecr_repository_uri = aws_ecr_repository.main.repository_url
     db_endpoint        = split(":", aws_db_instance.main.endpoint)[0]
     db_name            = var.db_name
@@ -344,7 +413,30 @@ locals {
     db_password        = var.db_password
     aws_region         = var.aws_region
     deployment_hash    = local.deployment_hash
+    frontend_url       = var.frontend_url
+    image_tag          = var.image_tag
   }))
+}
+
+# ============================================================================
+# ELASTIC IP FOR STABLE IP ADDRESS
+# ============================================================================
+
+resource "aws_eip" "main" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-eip"
+  }
+
+  # Ensure the internet gateway exists before creating EIP
+  depends_on = [aws_internet_gateway.main]
+}
+
+# Associate Elastic IP with EC2 instance
+resource "aws_eip_association" "main" {
+  instance_id   = aws_instance.main.id
+  allocation_id = aws_eip.main.id
 }
 
 # ============================================================================
