@@ -212,7 +212,7 @@ jobs:
       # ÉTAPE 6: Upload des rapports de tests
       # ----------------------------------------------------------------------
       - name: 📤 Upload des rapports de tests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pr-test-reports-${{ github.event.pull_request.number }}

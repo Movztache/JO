@@ -214,7 +214,7 @@ jobs:
       # ÉTAPE 7: Upload des artefacts pour les jobs suivants
       # ----------------------------------------------------------------------
       - name: 📤 Upload de l'artefact JAR
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vibe-tickets-jar
           path: target/*.jar
@@ -225,7 +225,7 @@ jobs:
       # ----------------------------------------------------------------------
       - name: 📊 Upload des rapports de tests
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: |
@@ -258,7 +258,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 📥 Download de l'artefact JAR
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vibe-tickets-jar
           path: target/
@@ -280,9 +280,9 @@ jobs:
           echo "🏷️ URI ECR: ${ECR_URI}"
           
           # Export des variables pour les étapes suivantes
-          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "ecr-uri=${ECR_URI}" >> $GITHUB_OUTPUT
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "ecr-uri=${ECR_URI}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
 
       # ----------------------------------------------------------------------
       # ÉTAPE 3: Configuration de Docker Buildx
@@ -394,7 +394,7 @@ jobs:
       # ÉTAPE 5: Reconstruction et push de l'image Docker
       # ----------------------------------------------------------------------
       - name: 📥 Download de l'artefact JAR
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vibe-tickets-jar
           path: target/
@@ -512,8 +512,8 @@ jobs:
           echo "   - ECR URL: ${ECR_URL}"
 
           # Export des outputs pour les étapes suivantes
-          echo "ec2-ip=${EC2_IP}" >> $GITHUB_OUTPUT
-          echo "rds-endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+          echo "ec2-ip=${EC2_IP}" >> "$GITHUB_OUTPUT"
+          echo "rds-endpoint=${RDS_ENDPOINT}" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Health Checks et validation du déploiement
@@ -611,16 +611,19 @@ jobs:
 
           # Informations sur le déploiement
           COMMIT_SHA="${{ github.sha }}"
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_MSG="${{ github.event.head_commit.message || 'Manual deployment' }}"
+          AUTHOR="${{ github.event.head_commit.author.name || github.actor }}"
           IMAGE_TAG="${{ needs.docker-build.outputs.image-tag }}"
 
-          echo "status=${STATUS}" >> $GITHUB_OUTPUT
-          echo "color=${COLOR}" >> $GITHUB_OUTPUT
-          echo "commit-sha=${COMMIT_SHA:0:7}" >> $GITHUB_OUTPUT
-          echo "commit-msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
-          echo "author=${AUTHOR}" >> $GITHUB_OUTPUT
-          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          # Nettoyer le message de commit pour éviter les caractères problématiques
+          COMMIT_MSG_CLEAN=$(echo "$COMMIT_MSG" | tr -d '\n\r' | sed 's/[^a-zA-Z0-9 ._-]//g')
+
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "color=${COLOR}" >> "$GITHUB_OUTPUT"
+          echo "commit-sha=${COMMIT_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit-msg=${COMMIT_MSG_CLEAN}" >> "$GITHUB_OUTPUT"
+          echo "author=${AUTHOR}" >> "$GITHUB_OUTPUT"
+          echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------------
       # ÉTAPE 2: Création du résumé GitHub
