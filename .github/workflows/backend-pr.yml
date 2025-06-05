@@ -84,7 +84,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'eclipse-temurin'
+          distribution: 'temurin'
 
       # ----------------------------------------------------------------------
       # ÉTAPE 3: Cache Maven
@@ -151,7 +151,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'eclipse-temurin'
+          distribution: 'temurin'
 
       # ----------------------------------------------------------------------
       # ÉTAPE 3: Cache Maven
@@ -217,9 +217,10 @@ jobs:
         with:
           name: pr-test-reports-${{ github.event.pull_request.number }}
           path: |
-            target/surefire-reports/
-            target/site/jacoco/
+            target/surefire-reports/**/*
+            target/site/jacoco/**/*
           retention-days: 7
+          if-no-files-found: warn
 
   # ==========================================================================
   # JOB 3: BUILD ET VALIDATION DOCKER
@@ -245,7 +246,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'eclipse-temurin'
+          distribution: 'temurin'
 
       # ----------------------------------------------------------------------
       # ÉTAPE 3: Build de l'application

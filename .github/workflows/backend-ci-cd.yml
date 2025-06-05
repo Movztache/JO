@@ -145,7 +145,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'eclipse-temurin'
+          distribution: 'temurin'
           
       # ----------------------------------------------------------------------
       # ÉTAPE 3: Cache des dépendances Maven
@@ -229,9 +229,10 @@ jobs:
         with:
           name: test-reports
           path: |
-            target/surefire-reports/
-            target/site/jacoco/
+            target/surefire-reports/**/*
+            target/site/jacoco/**/*
           retention-days: 7
+          if-no-files-found: warn
 
   # ==========================================================================
   # JOB 2: BUILD ET PUSH DOCKER (CI)
