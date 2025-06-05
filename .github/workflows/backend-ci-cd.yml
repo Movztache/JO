@@ -91,7 +91,7 @@ env:
   
   # Configuration Java et Maven
   JAVA_VERSION: '21'
-  MAVEN_OPTS: '-Xmx1024m -XX:MaxPermSize=256m'
+  MAVEN_OPTS: '-Xmx1024m -XX:MetaspaceSize=256m'
   
   # Configuration Docker
   DOCKER_BUILDKIT: 1
