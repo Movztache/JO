@@ -42,6 +42,7 @@ terraform/*.backup
 *.pem
 terraform/ssh-key*
 vibe-tickets-key-final.pem
+vibe-tickets-terraform-key.pub
 
 ### Temporary Files ###
 *.zip

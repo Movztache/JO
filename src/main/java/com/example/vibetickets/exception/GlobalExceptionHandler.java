@@ -77,6 +77,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Gère spécifiquement les erreurs de parsing JSON
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<Map<String, String>> handleJsonParseException(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        logService.error("Erreur de parsing JSON: " + ex.getMessage(), ex);
+
+        Map<String, String> errors = new HashMap<>();
+        errors.put("error", "Format JSON invalide");
+        errors.put("message", "Le format des données envoyées est incorrect. Vérifiez la syntaxe JSON.");
+        errors.put("details", ex.getMostSpecificCause().getMessage());
+
+        return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
      * Gère toutes les autres exceptions non spécifiquement traitées
      */
     @ExceptionHandler(Exception.class)

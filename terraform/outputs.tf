@@ -32,8 +32,8 @@ output "ec2_instance_id" {
 }
 
 output "ec2_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_instance.main.public_ip
+  description = "Public IP address of the EC2 instance (Elastic IP)"
+  value       = aws_eip.main.public_ip
 }
 
 output "ec2_public_dns" {
@@ -44,6 +44,16 @@ output "ec2_public_dns" {
 output "ec2_private_ip" {
   description = "Private IP address of the EC2 instance"
   value       = aws_instance.main.private_ip
+}
+
+output "elastic_ip" {
+  description = "Elastic IP address (stable IP)"
+  value       = aws_eip.main.public_ip
+}
+
+output "elastic_ip_allocation_id" {
+  description = "Elastic IP allocation ID"
+  value       = aws_eip.main.id
 }
 
 # ============================================================================
@@ -105,16 +115,16 @@ output "rds_security_group_id" {
 
 output "ssh_connection" {
   description = "SSH connection command"
-  value       = "ssh -i ${var.ec2_key_name}.pem ec2-user@${aws_instance.main.public_ip}"
+  value       = "ssh -i ${var.ec2_key_name}.pem ec2-user@${aws_eip.main.public_ip}"
 }
 
 output "application_url" {
   description = "Application URL"
-  value       = "http://${aws_instance.main.public_ip}:8080"
+  value       = "http://${aws_eip.main.public_ip}:8080"
 }
 
 output "database_connection_string" {
   description = "Database connection string"
-  value       = "postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/${var.db_name}"
+  value       = "postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.main.endpoint}/${var.db_name}"
   sensitive   = true
 }

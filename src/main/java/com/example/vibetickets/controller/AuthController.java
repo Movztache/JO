@@ -28,7 +28,7 @@ import java.util.*;
  * - Connexion (login)
  */
 @RestController
-@RequestMapping("/api/auth")  // Préfixe de tous les endpoints d'authentification
+@RequestMapping("/api/authentication")  // RETOUR au mapping original pour test final
 @CrossOrigin(origins = "*", maxAge = 3600)  // Permet les requêtes cross-origin
 public class AuthController {
 
@@ -67,29 +67,37 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        // Authentifie l'utilisateur avec Spring Security
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
 
-        // Stocke l'authentification dans le contexte de sécurité
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            // Authentifie l'utilisateur avec Spring Security
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
 
-        // Génère un token JWT pour l'utilisateur
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String jwt = jwtUtils.generateToken(userDetails);  // Utilise generateToken au lieu de generateJwtToken
+            // Stocke l'authentification dans le contexte de sécurité
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Récupère les détails de l'utilisateur connecté
-        UserApp user = userRepository.findByEmail(userDetails.getUsername());
-        if (user == null) {
-            throw new RuntimeException("Utilisateur non trouvé avec l'email: " + userDetails.getUsername());
+            // Génère un token JWT pour l'utilisateur
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String jwt = jwtUtils.generateToken(userDetails);
+
+            // Récupère les détails de l'utilisateur connecté
+            UserApp user = userRepository.findByEmail(userDetails.getUsername());
+            if (user == null) {
+                throw new RuntimeException("Utilisateur non trouvé avec l'email: " + userDetails.getUsername());
+            }
+
+            // Retourne le token JWT et les informations de base de l'utilisateur
+            JwtResponse response = new JwtResponse(
+                    jwt,
+                    user.getUserId(),
+                    user.getEmail(),
+                    user.getRole() != null ? user.getRole().getName() : "User");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            throw e;
         }
-
-        // Retourne le token JWT et les informations de base de l'utilisateur
-        return ResponseEntity.ok(new JwtResponse(
-                jwt,
-                user.getUserId(),
-                user.getEmail(),
-                user.getRole() != null ? user.getRole().getName() : "User"));
     }
 
     /**
@@ -100,47 +108,57 @@ public class AuthController {
      */
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody UserRegistrationDTO registrationDto) {
-        // Vérifier si les mots de passe correspondent
-        if (!registrationDto.passwordsMatch()) {
-            return ResponseEntity
-                    .badRequest()
-                    .body(Map.of("message", "Les mots de passe ne correspondent pas"));
+        try {
+            // Vérifier si les mots de passe correspondent
+            if (!registrationDto.passwordsMatch()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(Map.of("message", "Les mots de passe ne correspondent pas"));
+            }
+
+            // Vérifier si l'email existe déjà
+            if (userRepository.existsByEmail(registrationDto.getEmail())) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(Map.of("message", "Cet email est déjà utilisé"));
+            }
+
+            // Création d'un nouvel utilisateur à partir du DTO
+            UserApp newUser = new UserApp();
+            newUser.setFirstName(registrationDto.getFirstName());
+            newUser.setLastName(registrationDto.getLastName());
+            newUser.setEmail(registrationDto.getEmail());
+
+            // Encodage du mot de passe
+            String plainPassword = registrationDto.getPassword();
+            String encodedPassword = passwordEncoder.encode(plainPassword);
+            newUser.setPassword(encodedPassword);
+
+            // Génération de la clé unique
+            String userKey = userAppService.generateUniqueUserKey();
+            newUser.setUserKey(userKey);
+
+            // Attribution du rôle USER
+            Role userRole = roleRepository.findByName("User");
+
+            // Vérifier si le rôle existe
+            if (userRole == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Erreur: Le rôle USER n'est pas trouvé dans le système."));
+            }
+
+            newUser.setRole(userRole);
+
+            // Enregistrement de l'utilisateur
+            UserApp savedUser = userRepository.save(newUser);
+
+            // Retourner une réponse avec code 201 (CREATED)
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Map.of("message", "Utilisateur enregistré avec succès", "userId", savedUser.getUserId()));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Erreur interne lors de l'inscription", "error", e.getMessage()));
         }
-
-        // Vérifier si l'email existe déjà
-        if (userRepository.existsByEmail(registrationDto.getEmail())) {
-            return ResponseEntity
-                    .badRequest()
-                    .body(Map.of("message", "Cet email est déjà utilisé"));
-        }
-
-        // Création d'un nouvel utilisateur à partir du DTO
-        UserApp newUser = new UserApp();
-        newUser.setFirstName(registrationDto.getFirstName());
-        newUser.setLastName(registrationDto.getLastName());
-        newUser.setEmail(registrationDto.getEmail());
-        newUser.setPassword(passwordEncoder.encode(registrationDto.getPassword()));
-        // Génération de la clé unique
-        String userKey = userAppService.generateUniqueUserKey();
-        newUser.setUserKey(userKey);
-
-        // Attribution du rôle USER
-        Role userRole = roleRepository.findByName("User");
-
-        // Vérifier si le rôle existe
-        if (userRole == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Erreur: Le rôle USER n'est pas trouvé dans le système."));
-        }
-
-        // Assigner le rôle directement à l'utilisateur
-        newUser.setRole(userRole);
-
-        // Enregistrement de l'utilisateur
-        userRepository.save(newUser);
-
-        // Retourner une réponse avec code 201 (CREATED)
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("message", "Utilisateur enregistré avec succès"));
     }
 
     /**
