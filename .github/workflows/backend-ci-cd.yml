@@ -407,13 +407,34 @@ jobs:
 
           echo "✅ Terraform initialisé et validé"
 
-      - name: 📋 Plan Terraform
+      - name: Plan Terraform
         run: |
           cd terraform
-          echo "📋 Génération du plan de déploiement..."
-          terraform plan -detailed-exitcode
+          echo "Generation du plan de deploiement..."
 
-          echo "✅ Plan Terraform généré"
+          # Executer terraform plan et capturer le code de sortie
+          terraform plan -detailed-exitcode
+          PLAN_EXIT_CODE=$?
+
+          # Interpreter le code de sortie
+          case $PLAN_EXIT_CODE in
+            0)
+              echo "Aucun changement detecte"
+              ;;
+            1)
+              echo "Erreur dans le plan Terraform"
+              exit 1
+              ;;
+            2)
+              echo "Changements detectes - deploiement necessaire"
+              ;;
+            *)
+              echo "Code de sortie inattendu: $PLAN_EXIT_CODE"
+              exit 1
+              ;;
+          esac
+
+          echo "Plan Terraform genere avec succes"
 
       - name: 🚀 Application Terraform
         id: deploy
