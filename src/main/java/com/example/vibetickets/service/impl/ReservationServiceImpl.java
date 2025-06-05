@@ -81,6 +81,11 @@ public class ReservationServiceImpl implements ReservationService {
             throw new IllegalArgumentException("userKey ne peut pas être null ou vide");
         }
 
+        // Validation de la clé utilisateur
+        if (!userAppService.validateUserKey(userAppId, userKey)) {
+            throw new SecurityException("Clé utilisateur invalide");
+        }
+
         // Récupération de l'utilisateur et de l'offre
         UserApp userApp = userAppRepository.findById(userAppId)
                 .orElseThrow(() -> new NoSuchElementException("Utilisateur non trouvé avec ID: " + userAppId));

@@ -172,10 +172,10 @@ jobs:
         run: |
           echo "🧪 Exécution de tous les tests..."
           mvn clean test -B
-          
+
           echo "📊 Génération du rapport de couverture..."
           mvn jacoco:report
-          
+
           echo "✅ Tests terminés avec succès"
         env:
           SPRING_PROFILES_ACTIVE: test

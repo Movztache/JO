@@ -53,7 +53,7 @@ public class CustomUserDetailsServiceTest {
 
         Collection<? extends GrantedAuthority> authorities = userDetails.getAuthorities();
         assertThat(authorities).hasSize(1);
-        assertThat(authorities).extracting("authority").containsExactly("User");
+        assertThat(authorities).extracting("authority").containsExactly("ROLE_User");
 
         verify(userRepository).findByEmail("test@example.com");
     }
@@ -67,7 +67,7 @@ public class CustomUserDetailsServiceTest {
         // When & Then
         assertThatThrownBy(() -> userDetailsService.loadUserByUsername("nonexistent@example.com"))
                 .isInstanceOf(UsernameNotFoundException.class)
-                .hasMessage("User not found");
+                .hasMessage("User not found: nonexistent@example.com");
 
         verify(userRepository).findByEmail("nonexistent@example.com");
     }

@@ -187,7 +187,7 @@ jobs:
         run: |
           echo "🧪 Exécution des tests unitaires..."
           mvn test -B
-          
+
           echo "📊 Génération du rapport de couverture..."
           mvn jacoco:report
         env:

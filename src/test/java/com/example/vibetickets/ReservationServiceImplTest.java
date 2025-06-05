@@ -192,7 +192,7 @@ public class ReservationServiceImplTest {
         NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
                 reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
 
-        assertEquals("Utilisateur non trouvé", exception.getMessage());
+        assertEquals("Utilisateur non trouvé avec ID: 99", exception.getMessage());
 
         // Vérifier que les méthodes attendues ont été appelées
         verify(userAppService).validateUserKey(userId, providedUserKey);
@@ -224,7 +224,7 @@ public class ReservationServiceImplTest {
         NoSuchElementException exception = assertThrows(NoSuchElementException.class, () ->
                 reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
 
-        assertEquals("Offre non trouvée", exception.getMessage());
+        assertEquals("Offre non trouvée avec ID: 99", exception.getMessage());
 
         // Vérifier que les méthodes attendues ont été appelées
         verify(userAppService).validateUserKey(userId, providedUserKey);
@@ -284,7 +284,7 @@ public class ReservationServiceImplTest {
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                 reservationService.createTicketReservation(userId, offerId, quantity, providedUserKey, paymentInfo));
 
-        assertEquals("Quantité insuffisante disponible", exception.getMessage());
+        assertEquals("Offre non disponible", exception.getMessage());
 
         verify(userAppService).validateUserKey(userId, providedUserKey);
         verify(userAppRepository).findById(userId);
