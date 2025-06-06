@@ -400,6 +400,77 @@ jobs:
         run: |
           echo "Nettoyage des ressources AWS conflictuelles..."
 
+          # Nettoyer les VPC inutilises pour eviter la limite
+          echo "Verification des VPC existants..."
+          aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+
+          # Supprimer les anciens VPC vibe-tickets s'ils existent
+          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].VpcId' --output text)
+
+          if [ ! -z "$VPC_IDS" ]; then
+            echo "Suppression des anciens VPC vibe-tickets..."
+            for vpc_id in $VPC_IDS; do
+              echo "Suppression du VPC: $vpc_id"
+
+              # Supprimer les dependances du VPC d'abord
+              echo "Nettoyage des dependances du VPC $vpc_id..."
+
+              # Supprimer les instances EC2
+              aws ec2 describe-instances --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'Reservations[].Instances[?State.Name!=`terminated`].InstanceId' --output text | tr '\t' '\n' | while read instance_id; do
+                if [ ! -z "$instance_id" ]; then
+                  echo "Arret de l'instance: $instance_id"
+                  aws ec2 terminate-instances --region ${{ env.AWS_REGION }} --instance-ids $instance_id || echo "Erreur arret instance"
+                fi
+              done
+
+              # Attendre que les instances se terminent
+              echo "Attente de l'arret des instances..."
+              sleep 30
+
+              # Supprimer les subnets
+              aws ec2 describe-subnets --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'Subnets[].SubnetId' --output text | tr '\t' '\n' | while read subnet_id; do
+                if [ ! -z "$subnet_id" ]; then
+                  echo "Suppression du subnet: $subnet_id"
+                  aws ec2 delete-subnet --region ${{ env.AWS_REGION }} --subnet-id $subnet_id || echo "Erreur suppression subnet"
+                fi
+              done
+
+              # Supprimer les security groups (sauf default)
+              aws ec2 describe-security-groups --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text | tr '\t' '\n' | while read sg_id; do
+                if [ ! -z "$sg_id" ]; then
+                  echo "Suppression du security group: $sg_id"
+                  aws ec2 delete-security-group --region ${{ env.AWS_REGION }} --group-id $sg_id || echo "Erreur suppression SG"
+                fi
+              done
+
+              # Supprimer l'internet gateway
+              aws ec2 describe-internet-gateways --region ${{ env.AWS_REGION }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query 'InternetGateways[].InternetGatewayId' --output text | tr '\t' '\n' | while read igw_id; do
+                if [ ! -z "$igw_id" ]; then
+                  echo "Detachement et suppression de l'IGW: $igw_id"
+                  aws ec2 detach-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id --vpc-id $vpc_id || echo "Erreur detachement IGW"
+                  aws ec2 delete-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id || echo "Erreur suppression IGW"
+                fi
+              done
+
+              # Supprimer les route tables (sauf main)
+              aws ec2 describe-route-tables --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | tr '\t' '\n' | while read rt_id; do
+                if [ ! -z "$rt_id" ]; then
+                  echo "Suppression de la route table: $rt_id"
+                  aws ec2 delete-route-table --region ${{ env.AWS_REGION }} --route-table-id $rt_id || echo "Erreur suppression RT"
+                fi
+              done
+
+              # Finalement supprimer le VPC
+              echo "Suppression du VPC: $vpc_id"
+              aws ec2 delete-vpc --region ${{ env.AWS_REGION }} --vpc-id $vpc_id || echo "Erreur suppression VPC"
+            done
+
+            echo "Attente de la propagation des suppressions VPC..."
+            sleep 20
+          else
+            echo "Aucun VPC vibe-tickets trouve"
+          fi
+
           # Fonction pour supprimer le repository ECR
           echo "Verification du repository ECR..."
           if aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
