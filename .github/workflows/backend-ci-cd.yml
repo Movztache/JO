@@ -414,6 +414,8 @@ jobs:
           if aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "Suppression du DB subnet group existant..."
             aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} || echo "Erreur lors de la suppression DB subnet group"
+            echo "Attente de la suppression du DB subnet group..."
+            sleep 5
           else
             echo "DB subnet group n'existe pas"
           fi
@@ -448,6 +450,14 @@ jobs:
               fi
             done
 
+            # Supprimer aussi l'instance profile specifique s'il existe
+            echo "Verification de l'instance profile specifique..."
+            if aws iam get-instance-profile --instance-profile-name vibe-tickets-ec2-profile >/dev/null 2>&1; then
+              echo "Suppression de l'instance profile vibe-tickets-ec2-profile..."
+              aws iam remove-role-from-instance-profile --instance-profile-name vibe-tickets-ec2-profile --role-name vibe-tickets-ec2-role || echo "Role deja detache"
+              aws iam delete-instance-profile --instance-profile-name vibe-tickets-ec2-profile || echo "Erreur suppression instance profile"
+            fi
+
             # Supprimer le role
             echo "Suppression du role..."
             aws iam delete-role --role-name vibe-tickets-ec2-role || echo "Erreur suppression role"
@@ -455,8 +465,41 @@ jobs:
             echo "Role IAM n'existe pas"
           fi
 
-          echo "Nettoyage termine - attente de 10 secondes pour la propagation..."
-          sleep 10
+          echo "Nettoyage termine - verification finale..."
+
+          # Verification finale que les ressources sont supprimees
+          echo "Verification finale des ressources..."
+
+          # Verifier ECR
+          if aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "ATTENTION: Repository ECR existe encore"
+          else
+            echo "ECR Repository: OK (supprime)"
+          fi
+
+          # Verifier DB Subnet Group
+          if aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "ATTENTION: DB Subnet Group existe encore"
+          else
+            echo "DB Subnet Group: OK (supprime)"
+          fi
+
+          # Verifier IAM Role
+          if aws iam get-role --role-name vibe-tickets-ec2-role >/dev/null 2>&1; then
+            echo "ATTENTION: IAM Role existe encore"
+          else
+            echo "IAM Role: OK (supprime)"
+          fi
+
+          # Verifier Instance Profile
+          if aws iam get-instance-profile --instance-profile-name vibe-tickets-ec2-profile >/dev/null 2>&1; then
+            echo "ATTENTION: Instance Profile existe encore"
+          else
+            echo "Instance Profile: OK (supprime)"
+          fi
+
+          echo "Attente de 15 secondes pour la propagation AWS..."
+          sleep 15
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Déploiement avec Terraform
