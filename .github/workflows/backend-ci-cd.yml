@@ -428,19 +428,24 @@ jobs:
             fi
 
             echo "📥 Import en cours..."
-            if terraform import "$resource_type.$resource_name" "$aws_id" 2>/dev/null; then
+            echo "Commande: terraform import $resource_type.$resource_name $aws_id"
+
+            if terraform import "$resource_type.$resource_name" "$aws_id"; then
               echo "✅ $description importé avec succès"
             else
               echo "❌ Échec de l'import de $description"
               echo "🔧 Tentative de suppression de l'état corrompu..."
               terraform state rm "$resource_type.$resource_name" 2>/dev/null || true
 
-              echo "🔄 Nouvelle tentative d'import..."
-              if terraform import "$resource_type.$resource_name" "$aws_id" 2>/dev/null; then
+              echo "🔄 Nouvelle tentative d'import avec debug..."
+              if terraform import "$resource_type.$resource_name" "$aws_id"; then
                 echo "✅ $description importé à la seconde tentative"
               else
                 echo "❌ Import définitivement échoué pour $description"
                 echo "⚠️  Cette ressource sera ignorée et pourrait causer des conflits"
+                echo "🔍 Debug: Vérification de l'existence de la ressource..."
+                echo "AWS ID trouvé: $aws_id"
+                echo "Type Terraform: $resource_type.$resource_name"
               fi
             fi
             echo ""
@@ -485,7 +490,18 @@ jobs:
           echo "=========================================="
           echo "RÉSUMÉ DE L'IMPORT"
           echo "=========================================="
-          terraform state list | wc -l | xargs echo "Ressources dans l'état Terraform:"
+
+          RESOURCE_COUNT=$(terraform state list | wc -l)
+          echo "Ressources dans l'état Terraform: $RESOURCE_COUNT"
+
+          if [ "$RESOURCE_COUNT" -gt 0 ]; then
+            echo "📋 Liste des ressources importées:"
+            terraform state list
+          else
+            echo "⚠️  ATTENTION: Aucune ressource dans l'état Terraform!"
+            echo "🔍 Cela peut causer des conflits lors du terraform apply"
+          fi
+
           echo ""
           echo "État Terraform synchronisé avec AWS"
           echo "=========================================="
