@@ -397,64 +397,98 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 9: Nettoyage des ressources conflictuelles
       # ----------------------------------------------------------------------
-      - name: Detection et import des ressources existantes
+      - name: Import des ressources existantes dans Terraform
         run: |
-          echo "Detection des ressources AWS existantes..."
+          cd terraform
 
-          # Fonction pour importer une ressource si elle existe
-          import_if_exists() {
+          echo "=========================================="
+          echo "IMPORT DES RESSOURCES EXISTANTES"
+          echo "=========================================="
+
+          # Fonction d'import robuste
+          safe_import() {
             local resource_type="$1"
             local resource_name="$2"
             local aws_id="$3"
+            local description="$4"
 
-            if [ ! -z "$aws_id" ] && [ "$aws_id" != "None" ]; then
-              echo "Import de $resource_type.$resource_name avec ID: $aws_id"
-              terraform import "$resource_type.$resource_name" "$aws_id" || echo "Ressource déjà dans l'état ou erreur d'import"
-            else
-              echo "Ressource $resource_type.$resource_name n'existe pas - sera créée"
+            echo "--- Import de $description ---"
+
+            if [ "$aws_id" = "None" ] || [ -z "$aws_id" ]; then
+              echo "✅ $description n'existe pas - sera créé par Terraform"
+              return 0
             fi
+
+            echo "🔍 Ressource trouvée: $aws_id"
+
+            # Vérifier si déjà dans l'état
+            if terraform state show "$resource_type.$resource_name" >/dev/null 2>&1; then
+              echo "✅ $description déjà dans l'état Terraform"
+              return 0
+            fi
+
+            echo "📥 Import en cours..."
+            if terraform import "$resource_type.$resource_name" "$aws_id" 2>/dev/null; then
+              echo "✅ $description importé avec succès"
+            else
+              echo "❌ Échec de l'import de $description"
+              echo "🔧 Tentative de suppression de l'état corrompu..."
+              terraform state rm "$resource_type.$resource_name" 2>/dev/null || true
+
+              echo "🔄 Nouvelle tentative d'import..."
+              if terraform import "$resource_type.$resource_name" "$aws_id" 2>/dev/null; then
+                echo "✅ $description importé à la seconde tentative"
+              else
+                echo "❌ Import définitivement échoué pour $description"
+                echo "⚠️  Cette ressource sera ignorée et pourrait causer des conflits"
+              fi
+            fi
+            echo ""
           }
 
-          cd terraform
-
-          # Initialiser Terraform d'abord
-          terraform init
-
-          echo "Recherche des ressources existantes..."
+          # Recherche et import des ressources
+          echo "🔍 Recherche des ressources existantes dans AWS..."
+          echo ""
 
           # 1. ECR Repository
           ECR_REPO=$(aws ecr describe-repositories --region ${{ env.AWS_REGION }} --repository-names vibe-tickets --query 'repositories[0].repositoryName' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_ecr_repository" "main" "$ECR_REPO"
+          safe_import "aws_ecr_repository" "main" "$ECR_REPO" "ECR Repository (vibe-tickets)"
 
-          # 2. VPC
-          VPC_ID=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --filters "Name=tag:Name,Values=vibe-tickets-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_vpc" "main" "$VPC_ID"
-
-          # 3. DB Subnet Group
-          DB_SUBNET_GROUP=$(aws rds describe-db-subnet-groups --region ${{ env.AWS_REGION }} --db-subnet-group-name vibe-tickets-db-subnet-group --query 'DBSubnetGroups[0].DBSubnetGroupName' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_db_subnet_group" "main" "$DB_SUBNET_GROUP"
-
-          # 4. IAM Role
+          # 2. IAM Role
           IAM_ROLE=$(aws iam get-role --role-name vibe-tickets-ec2-role --query 'Role.RoleName' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_iam_role" "ec2" "$IAM_ROLE"
+          safe_import "aws_iam_role" "ec2" "$IAM_ROLE" "IAM Role (vibe-tickets-ec2-role)"
 
-          # 5. IAM Instance Profile
+          # 3. IAM Instance Profile
           IAM_PROFILE=$(aws iam get-instance-profile --instance-profile-name vibe-tickets-ec2-profile --query 'InstanceProfile.InstanceProfileName' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_iam_instance_profile" "ec2" "$IAM_PROFILE"
+          safe_import "aws_iam_instance_profile" "ec2" "$IAM_PROFILE" "IAM Instance Profile (vibe-tickets-ec2-profile)"
 
-          # 6. RDS Instance
-          RDS_ID=$(aws rds describe-db-instances --region ${{ env.AWS_REGION }} --db-instance-identifier vibe-tickets-db --query 'DBInstances[0].DBInstanceIdentifier' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_db_instance" "main" "$RDS_ID"
+          # 4. DB Subnet Group
+          DB_SUBNET_GROUP=$(aws rds describe-db-subnet-groups --region ${{ env.AWS_REGION }} --db-subnet-group-name vibe-tickets-db-subnet-group --query 'DBSubnetGroups[0].DBSubnetGroupName' --output text 2>/dev/null || echo "None")
+          safe_import "aws_db_subnet_group" "main" "$DB_SUBNET_GROUP" "DB Subnet Group (vibe-tickets-db-subnet-group)"
 
-          # 7. EC2 Instance
-          EC2_ID=$(aws ec2 describe-instances --region ${{ env.AWS_REGION }} --filters "Name=tag:Name,Values=vibe-tickets-server" "Name=instance-state-name,Values=running,stopped,pending,stopping" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_instance" "main" "$EC2_ID"
-
-          # 8. Elastic IP
+          # 5. Elastic IP (recherche par tag)
           EIP_ID=$(aws ec2 describe-addresses --region ${{ env.AWS_REGION }} --filters "Name=tag:Name,Values=vibe-tickets-eip" --query 'Addresses[0].AllocationId' --output text 2>/dev/null || echo "None")
-          import_if_exists "aws_eip" "main" "$EIP_ID"
+          safe_import "aws_eip" "main" "$EIP_ID" "Elastic IP (vibe-tickets-eip)"
 
-          echo "Import des ressources existantes terminé"
+          # 6. VPC
+          VPC_ID=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --filters "Name=tag:Name,Values=vibe-tickets-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
+          safe_import "aws_vpc" "main" "$VPC_ID" "VPC (vibe-tickets-vpc)"
+
+          # 7. RDS Instance
+          RDS_ID=$(aws rds describe-db-instances --region ${{ env.AWS_REGION }} --db-instance-identifier vibe-tickets-db --query 'DBInstances[0].DBInstanceIdentifier' --output text 2>/dev/null || echo "None")
+          safe_import "aws_db_instance" "main" "$RDS_ID" "RDS Instance (vibe-tickets-db)"
+
+          # 8. EC2 Instance
+          EC2_ID=$(aws ec2 describe-instances --region ${{ env.AWS_REGION }} --filters "Name=tag:Name,Values=vibe-tickets-server" "Name=instance-state-name,Values=running,stopped,pending,stopping" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "None")
+          safe_import "aws_instance" "main" "$EC2_ID" "EC2 Instance (vibe-tickets-server)"
+
+          echo "=========================================="
+          echo "RÉSUMÉ DE L'IMPORT"
+          echo "=========================================="
+          terraform state list | wc -l | xargs echo "Ressources dans l'état Terraform:"
+          echo ""
+          echo "État Terraform synchronisé avec AWS"
+          echo "=========================================="
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Déploiement avec Terraform
