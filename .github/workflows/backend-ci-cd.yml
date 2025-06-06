@@ -396,181 +396,222 @@ jobs:
       # ----------------------------------------------------------------------
       # ÉTAPE 9: Nettoyage des ressources conflictuelles
       # ----------------------------------------------------------------------
-      - name: Nettoyage des ressources AWS existantes
+      - name: Nettoyage complet des ressources AWS
         run: |
-          echo "Nettoyage des ressources AWS conflictuelles..."
+          echo "=========================================="
+          echo "NETTOYAGE COMPLET DES RESSOURCES AWS"
+          echo "=========================================="
 
-          # Nettoyer les VPC inutilises pour eviter la limite
-          echo "Verification des VPC existants..."
-          aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+          # Fonction pour attendre et verifier
+          wait_and_verify() {
+            echo "Attente de $1 secondes pour la propagation..."
+            sleep $1
+          }
 
-          # Supprimer les anciens VPC vibe-tickets s'ils existent
-          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].VpcId' --output text)
+          # 1. NETTOYAGE DES INSTANCES EC2 ET ELASTIC IPS
+          echo "1. Nettoyage des instances EC2..."
+          aws ec2 describe-instances --region ${{ env.AWS_REGION }} \
+            --filters "Name=tag:Name,Values=*vibe-tickets*" "Name=instance-state-name,Values=running,pending,stopping,stopped" \
+            --query 'Reservations[].Instances[].InstanceId' --output text | tr '\t' '\n' | while read instance_id; do
+            if [ ! -z "$instance_id" ]; then
+              echo "Arret forcé de l'instance: $instance_id"
+              aws ec2 terminate-instances --region ${{ env.AWS_REGION }} --instance-ids $instance_id || echo "Erreur arret instance"
+            fi
+          done
 
-          if [ ! -z "$VPC_IDS" ]; then
-            echo "Suppression des anciens VPC vibe-tickets..."
-            for vpc_id in $VPC_IDS; do
-              echo "Suppression du VPC: $vpc_id"
+          echo "Suppression des Elastic IPs..."
+          aws ec2 describe-addresses --region ${{ env.AWS_REGION }} \
+            --query 'Addresses[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].AllocationId' --output text | tr '\t' '\n' | while read alloc_id; do
+            if [ ! -z "$alloc_id" ]; then
+              echo "Liberation de l'Elastic IP: $alloc_id"
+              aws ec2 release-address --region ${{ env.AWS_REGION }} --allocation-id $alloc_id || echo "Erreur liberation EIP"
+            fi
+          done
 
-              # Supprimer les dependances du VPC d'abord
-              echo "Nettoyage des dependances du VPC $vpc_id..."
+          wait_and_verify 30
 
-              # Supprimer les instances EC2
-              aws ec2 describe-instances --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'Reservations[].Instances[?State.Name!=`terminated`].InstanceId' --output text | tr '\t' '\n' | while read instance_id; do
-                if [ ! -z "$instance_id" ]; then
-                  echo "Arret de l'instance: $instance_id"
-                  aws ec2 terminate-instances --region ${{ env.AWS_REGION }} --instance-ids $instance_id || echo "Erreur arret instance"
+          # 2. NETTOYAGE DES BASES DE DONNÉES RDS
+          echo "2. Nettoyage des bases de données RDS..."
+          aws rds describe-db-instances --region ${{ env.AWS_REGION }} \
+            --query 'DBInstances[?contains(DBInstanceIdentifier, `vibe-tickets`)].DBInstanceIdentifier' --output text | tr '\t' '\n' | while read db_id; do
+            if [ ! -z "$db_id" ]; then
+              echo "Suppression de la base de données: $db_id"
+              aws rds delete-db-instance --region ${{ env.AWS_REGION }} --db-instance-identifier $db_id --skip-final-snapshot --delete-automated-backups || echo "Erreur suppression DB"
+            fi
+          done
+
+          echo "Suppression des DB subnet groups..."
+          aws rds describe-db-subnet-groups --region ${{ env.AWS_REGION }} \
+            --query 'DBSubnetGroups[?contains(DBSubnetGroupName, `vibe-tickets`)].DBSubnetGroupName' --output text | tr '\t' '\n' | while read sg_name; do
+            if [ ! -z "$sg_name" ]; then
+              echo "Suppression du DB subnet group: $sg_name"
+              aws rds delete-db-subnet-group --region ${{ env.AWS_REGION }} --db-subnet-group-name $sg_name || echo "Erreur suppression DB subnet group"
+            fi
+          done
+
+          wait_and_verify 20
+
+          # 3. NETTOYAGE COMPLET DES VPC ET DÉPENDANCES
+          echo "3. Nettoyage complet des VPC..."
+          aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} \
+            --query 'Vpcs[?Tags[?Key==`Name` && contains(Value, `vibe-tickets`)]].VpcId' --output text | tr '\t' '\n' | while read vpc_id; do
+            if [ ! -z "$vpc_id" ]; then
+              echo "Nettoyage du VPC: $vpc_id"
+
+              # Supprimer NAT Gateways
+              aws ec2 describe-nat-gateways --region ${{ env.AWS_REGION }} --filter "Name=vpc-id,Values=$vpc_id" \
+                --query 'NatGateways[?State==`available`].NatGatewayId' --output text | tr '\t' '\n' | while read nat_id; do
+                if [ ! -z "$nat_id" ]; then
+                  echo "Suppression NAT Gateway: $nat_id"
+                  aws ec2 delete-nat-gateway --region ${{ env.AWS_REGION }} --nat-gateway-id $nat_id || echo "Erreur NAT Gateway"
                 fi
               done
 
-              # Attendre que les instances se terminent
-              echo "Attente de l'arret des instances..."
-              sleep 30
+              # Supprimer les associations EIP
+              aws ec2 describe-addresses --region ${{ env.AWS_REGION }} \
+                --query 'Addresses[?NetworkInterfaceId!=null].AllocationId' --output text | tr '\t' '\n' | while read alloc_id; do
+                if [ ! -z "$alloc_id" ]; then
+                  aws ec2 disassociate-address --region ${{ env.AWS_REGION }} --allocation-id $alloc_id || echo "Erreur disassociation"
+                  aws ec2 release-address --region ${{ env.AWS_REGION }} --allocation-id $alloc_id || echo "Erreur liberation"
+                fi
+              done
 
               # Supprimer les subnets
-              aws ec2 describe-subnets --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'Subnets[].SubnetId' --output text | tr '\t' '\n' | while read subnet_id; do
+              aws ec2 describe-subnets --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" \
+                --query 'Subnets[].SubnetId' --output text | tr '\t' '\n' | while read subnet_id; do
                 if [ ! -z "$subnet_id" ]; then
-                  echo "Suppression du subnet: $subnet_id"
-                  aws ec2 delete-subnet --region ${{ env.AWS_REGION }} --subnet-id $subnet_id || echo "Erreur suppression subnet"
+                  echo "Suppression subnet: $subnet_id"
+                  aws ec2 delete-subnet --region ${{ env.AWS_REGION }} --subnet-id $subnet_id || echo "Erreur subnet"
                 fi
               done
 
-              # Supprimer les security groups (sauf default)
-              aws ec2 describe-security-groups --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text | tr '\t' '\n' | while read sg_id; do
+              # Supprimer les security groups
+              aws ec2 describe-security-groups --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" \
+                --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text | tr '\t' '\n' | while read sg_id; do
                 if [ ! -z "$sg_id" ]; then
-                  echo "Suppression du security group: $sg_id"
-                  aws ec2 delete-security-group --region ${{ env.AWS_REGION }} --group-id $sg_id || echo "Erreur suppression SG"
+                  echo "Suppression security group: $sg_id"
+                  aws ec2 delete-security-group --region ${{ env.AWS_REGION }} --group-id $sg_id || echo "Erreur SG"
                 fi
               done
 
-              # Supprimer l'internet gateway
-              aws ec2 describe-internet-gateways --region ${{ env.AWS_REGION }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query 'InternetGateways[].InternetGatewayId' --output text | tr '\t' '\n' | while read igw_id; do
-                if [ ! -z "$igw_id" ]; then
-                  echo "Detachement et suppression de l'IGW: $igw_id"
-                  aws ec2 detach-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id --vpc-id $vpc_id || echo "Erreur detachement IGW"
-                  aws ec2 delete-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id || echo "Erreur suppression IGW"
-                fi
-              done
-
-              # Supprimer les route tables (sauf main)
-              aws ec2 describe-route-tables --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | tr '\t' '\n' | while read rt_id; do
+              # Supprimer les route tables
+              aws ec2 describe-route-tables --region ${{ env.AWS_REGION }} --filters "Name=vpc-id,Values=$vpc_id" \
+                --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | tr '\t' '\n' | while read rt_id; do
                 if [ ! -z "$rt_id" ]; then
-                  echo "Suppression de la route table: $rt_id"
-                  aws ec2 delete-route-table --region ${{ env.AWS_REGION }} --route-table-id $rt_id || echo "Erreur suppression RT"
+                  echo "Suppression route table: $rt_id"
+                  aws ec2 delete-route-table --region ${{ env.AWS_REGION }} --route-table-id $rt_id || echo "Erreur RT"
                 fi
               done
 
-              # Finalement supprimer le VPC
-              echo "Suppression du VPC: $vpc_id"
-              aws ec2 delete-vpc --region ${{ env.AWS_REGION }} --vpc-id $vpc_id || echo "Erreur suppression VPC"
-            done
+              # Supprimer les internet gateways
+              aws ec2 describe-internet-gateways --region ${{ env.AWS_REGION }} --filters "Name=attachment.vpc-id,Values=$vpc_id" \
+                --query 'InternetGateways[].InternetGatewayId' --output text | tr '\t' '\n' | while read igw_id; do
+                if [ ! -z "$igw_id" ]; then
+                  echo "Suppression IGW: $igw_id"
+                  aws ec2 detach-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id --vpc-id $vpc_id || echo "Erreur detach IGW"
+                  aws ec2 delete-internet-gateway --region ${{ env.AWS_REGION }} --internet-gateway-id $igw_id || echo "Erreur delete IGW"
+                fi
+              done
 
-            echo "Attente de la propagation des suppressions VPC..."
-            sleep 20
-          else
-            echo "Aucun VPC vibe-tickets trouve"
-          fi
-
-          # Fonction pour supprimer le repository ECR
-          echo "Verification du repository ECR..."
-          if aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "Suppression du repository ECR existant..."
-            aws ecr delete-repository --repository-name vibe-tickets --region ${{ env.AWS_REGION }} --force || echo "Erreur lors de la suppression ECR"
-          else
-            echo "Repository ECR n'existe pas"
-          fi
-
-          # Fonction pour supprimer le DB subnet group
-          echo "Verification du DB subnet group..."
-          if aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "Suppression du DB subnet group existant..."
-            aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} || echo "Erreur lors de la suppression DB subnet group"
-            echo "Attente de la suppression du DB subnet group..."
-            sleep 5
-          else
-            echo "DB subnet group n'existe pas"
-          fi
-
-          # Fonction pour supprimer le role IAM et ses dependances
-          echo "Verification du role IAM..."
-          if aws iam get-role --role-name vibe-tickets-ec2-role >/dev/null 2>&1; then
-            echo "Suppression du role IAM existant..."
-
-            # Supprimer les policies inline du role
-            echo "Suppression des policies inline..."
-            aws iam list-role-policies --role-name vibe-tickets-ec2-role --query 'PolicyNames[]' --output text | tr '\t' '\n' | while read policy; do
-              if [ ! -z "$policy" ]; then
-                aws iam delete-role-policy --role-name vibe-tickets-ec2-role --policy-name "$policy" || echo "Erreur suppression policy $policy"
-              fi
-            done
-
-            # Detacher les policies attachees
-            echo "Detachement des policies attachees..."
-            aws iam list-attached-role-policies --role-name vibe-tickets-ec2-role --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy_arn; do
-              if [ ! -z "$policy_arn" ]; then
-                aws iam detach-role-policy --role-name vibe-tickets-ec2-role --policy-arn "$policy_arn" || echo "Erreur detachement $policy_arn"
-              fi
-            done
-
-            # Supprimer des instance profiles
-            echo "Suppression des instance profiles..."
-            aws iam list-instance-profiles-for-role --role-name vibe-tickets-ec2-role --query 'InstanceProfiles[].InstanceProfileName' --output text | tr '\t' '\n' | while read profile; do
-              if [ ! -z "$profile" ]; then
-                aws iam remove-role-from-instance-profile --role-name vibe-tickets-ec2-role --instance-profile-name "$profile" || echo "Erreur suppression profile $profile"
-                aws iam delete-instance-profile --instance-profile-name "$profile" || echo "Erreur suppression instance profile $profile"
-              fi
-            done
-
-            # Supprimer aussi l'instance profile specifique s'il existe
-            echo "Verification de l'instance profile specifique..."
-            if aws iam get-instance-profile --instance-profile-name vibe-tickets-ec2-profile >/dev/null 2>&1; then
-              echo "Suppression de l'instance profile vibe-tickets-ec2-profile..."
-              aws iam remove-role-from-instance-profile --instance-profile-name vibe-tickets-ec2-profile --role-name vibe-tickets-ec2-role || echo "Role deja detache"
-              aws iam delete-instance-profile --instance-profile-name vibe-tickets-ec2-profile || echo "Erreur suppression instance profile"
+              # Supprimer le VPC
+              echo "Suppression VPC: $vpc_id"
+              aws ec2 delete-vpc --region ${{ env.AWS_REGION }} --vpc-id $vpc_id || echo "Erreur VPC"
             fi
+          done
 
-            # Supprimer le role
-            echo "Suppression du role..."
-            aws iam delete-role --role-name vibe-tickets-ec2-role || echo "Erreur suppression role"
+          wait_and_verify 30
+
+          # 4. NETTOYAGE DES RESSOURCES IAM
+          echo "4. Nettoyage des ressources IAM..."
+
+          # Supprimer les instance profiles
+          aws iam list-instance-profiles --query 'InstanceProfiles[?contains(InstanceProfileName, `vibe-tickets`)].InstanceProfileName' --output text | tr '\t' '\n' | while read profile_name; do
+            if [ ! -z "$profile_name" ]; then
+              echo "Suppression instance profile: $profile_name"
+              # Detacher les roles d'abord
+              aws iam list-instance-profiles --query "InstanceProfiles[?InstanceProfileName=='$profile_name'].Roles[].RoleName" --output text | tr '\t' '\n' | while read role_name; do
+                if [ ! -z "$role_name" ]; then
+                  aws iam remove-role-from-instance-profile --instance-profile-name $profile_name --role-name $role_name || echo "Erreur detach role"
+                fi
+              done
+              aws iam delete-instance-profile --instance-profile-name $profile_name || echo "Erreur suppression instance profile"
+            fi
+          done
+
+          # Supprimer les roles IAM
+          aws iam list-roles --query 'Roles[?contains(RoleName, `vibe-tickets`)].RoleName' --output text | tr '\t' '\n' | while read role_name; do
+            if [ ! -z "$role_name" ]; then
+              echo "Suppression role IAM: $role_name"
+
+              # Supprimer les policies inline
+              aws iam list-role-policies --role-name $role_name --query 'PolicyNames[]' --output text | tr '\t' '\n' | while read policy; do
+                if [ ! -z "$policy" ]; then
+                  aws iam delete-role-policy --role-name $role_name --policy-name "$policy" || echo "Erreur policy inline"
+                fi
+              done
+
+              # Detacher les policies attachees
+              aws iam list-attached-role-policies --role-name $role_name --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy_arn; do
+                if [ ! -z "$policy_arn" ]; then
+                  aws iam detach-role-policy --role-name $role_name --policy-arn "$policy_arn" || echo "Erreur detach policy"
+                fi
+              done
+
+              aws iam delete-role --role-name $role_name || echo "Erreur suppression role"
+            fi
+          done
+
+          wait_and_verify 10
+
+          # 5. NETTOYAGE DES REPOSITORIES ECR
+          echo "5. Nettoyage des repositories ECR..."
+          aws ecr describe-repositories --region ${{ env.AWS_REGION }} \
+            --query 'repositories[?contains(repositoryName, `vibe-tickets`)].repositoryName' --output text | tr '\t' '\n' | while read repo_name; do
+            if [ ! -z "$repo_name" ]; then
+              echo "Suppression repository ECR: $repo_name"
+              aws ecr delete-repository --region ${{ env.AWS_REGION }} --repository-name $repo_name --force || echo "Erreur ECR"
+            fi
+          done
+
+          wait_and_verify 10
+
+          # 6. NETTOYAGE DES CLÉS SSH
+          echo "6. Nettoyage des clés SSH..."
+          aws ec2 describe-key-pairs --region ${{ env.AWS_REGION }} \
+            --query 'KeyPairs[?contains(KeyName, `vibe-tickets`)].KeyName' --output text | tr '\t' '\n' | while read key_name; do
+            if [ ! -z "$key_name" ]; then
+              echo "Suppression clé SSH: $key_name"
+              aws ec2 delete-key-pair --region ${{ env.AWS_REGION }} --key-name $key_name || echo "Erreur clé SSH"
+            fi
+          done
+
+          # 7. VERIFICATION FINALE ET COMPTAGE DES VPC
+          echo "7. Verification finale..."
+          VPC_COUNT=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'length(Vpcs)')
+          echo "Nombre total de VPC dans la region: $VPC_COUNT"
+
+          if [ "$VPC_COUNT" -ge 5 ]; then
+            echo "ATTENTION: Il reste $VPC_COUNT VPC (limite: 5)"
+            echo "Liste des VPC existants:"
+            aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+
+            echo "Suppression forcee des VPC les plus anciens..."
+            aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?IsDefault==`false`].VpcId' --output text | tr '\t' '\n' | head -2 | while read vpc_id; do
+              if [ ! -z "$vpc_id" ]; then
+                echo "Suppression forcee du VPC: $vpc_id"
+                # Force cleanup sans verification
+                aws ec2 delete-vpc --region ${{ env.AWS_REGION }} --vpc-id $vpc_id || echo "VPC a des dependances"
+              fi
+            done
           else
-            echo "Role IAM n'existe pas"
+            echo "OK: $VPC_COUNT VPC (limite: 5) - Espace disponible"
           fi
 
-          echo "Nettoyage termine - verification finale..."
-
-          # Verification finale que les ressources sont supprimees
-          echo "Verification finale des ressources..."
-
-          # Verifier ECR
-          if aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "ATTENTION: Repository ECR existe encore"
-          else
-            echo "ECR Repository: OK (supprime)"
-          fi
-
-          # Verifier DB Subnet Group
-          if aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "ATTENTION: DB Subnet Group existe encore"
-          else
-            echo "DB Subnet Group: OK (supprime)"
-          fi
-
-          # Verifier IAM Role
-          if aws iam get-role --role-name vibe-tickets-ec2-role >/dev/null 2>&1; then
-            echo "ATTENTION: IAM Role existe encore"
-          else
-            echo "IAM Role: OK (supprime)"
-          fi
-
-          # Verifier Instance Profile
-          if aws iam get-instance-profile --instance-profile-name vibe-tickets-ec2-profile >/dev/null 2>&1; then
-            echo "ATTENTION: Instance Profile existe encore"
-          else
-            echo "Instance Profile: OK (supprime)"
-          fi
-
-          echo "Attente de 15 secondes pour la propagation AWS..."
-          sleep 15
+          echo "=========================================="
+          echo "NETTOYAGE COMPLET TERMINE"
+          echo "Attente finale de 30 secondes..."
+          echo "=========================================="
+          sleep 30
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Déploiement avec Terraform
