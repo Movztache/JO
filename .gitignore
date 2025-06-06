@@ -35,7 +35,7 @@ build/
 ### Terraform ###
 terraform/.terraform/
 terraform/.terraform.lock.hcl
-terraform/terraform.tfstate*
+# terraform/terraform.tfstate* - Commenté pour permettre le partage avec GitHub Actions
 terraform/*.backup
 
 ### SSH Keys ###
