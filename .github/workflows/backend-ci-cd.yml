@@ -400,30 +400,63 @@ jobs:
         run: |
           echo "Nettoyage des ressources AWS conflictuelles..."
 
-          # Supprimer le repository ECR s'il existe
-          aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} 2>/dev/null && {
+          # Fonction pour supprimer le repository ECR
+          echo "Verification du repository ECR..."
+          if aws ecr describe-repositories --repository-names vibe-tickets --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "Suppression du repository ECR existant..."
-            aws ecr delete-repository --repository-name vibe-tickets --region ${{ env.AWS_REGION }} --force
-          } || echo "Repository ECR n'existe pas"
+            aws ecr delete-repository --repository-name vibe-tickets --region ${{ env.AWS_REGION }} --force || echo "Erreur lors de la suppression ECR"
+          else
+            echo "Repository ECR n'existe pas"
+          fi
 
-          # Supprimer le DB subnet group s'il existe
-          aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} 2>/dev/null && {
+          # Fonction pour supprimer le DB subnet group
+          echo "Verification du DB subnet group..."
+          if aws rds describe-db-subnet-groups --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "Suppression du DB subnet group existant..."
-            aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }}
-          } || echo "DB subnet group n'existe pas"
+            aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} || echo "Erreur lors de la suppression DB subnet group"
+          else
+            echo "DB subnet group n'existe pas"
+          fi
 
-          # Supprimer le role IAM s'il existe
-          aws iam get-role --role-name vibe-tickets-ec2-role 2>/dev/null && {
+          # Fonction pour supprimer le role IAM et ses dependances
+          echo "Verification du role IAM..."
+          if aws iam get-role --role-name vibe-tickets-ec2-role >/dev/null 2>&1; then
             echo "Suppression du role IAM existant..."
-            # Detacher les policies d'abord
-            aws iam list-attached-role-policies --role-name vibe-tickets-ec2-role --query 'AttachedPolicies[].PolicyArn' --output text | xargs -r -n1 aws iam detach-role-policy --role-name vibe-tickets-ec2-role --policy-arn
-            # Supprimer les instance profiles
-            aws iam list-instance-profiles-for-role --role-name vibe-tickets-ec2-role --query 'InstanceProfiles[].InstanceProfileName' --output text | xargs -r -n1 aws iam remove-role-from-instance-profile --role-name vibe-tickets-ec2-role --instance-profile-name
-            # Supprimer le role
-            aws iam delete-role --role-name vibe-tickets-ec2-role
-          } || echo "Role IAM n'existe pas"
 
-          echo "Nettoyage termine"
+            # Supprimer les policies inline du role
+            echo "Suppression des policies inline..."
+            aws iam list-role-policies --role-name vibe-tickets-ec2-role --query 'PolicyNames[]' --output text | tr '\t' '\n' | while read policy; do
+              if [ ! -z "$policy" ]; then
+                aws iam delete-role-policy --role-name vibe-tickets-ec2-role --policy-name "$policy" || echo "Erreur suppression policy $policy"
+              fi
+            done
+
+            # Detacher les policies attachees
+            echo "Detachement des policies attachees..."
+            aws iam list-attached-role-policies --role-name vibe-tickets-ec2-role --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy_arn; do
+              if [ ! -z "$policy_arn" ]; then
+                aws iam detach-role-policy --role-name vibe-tickets-ec2-role --policy-arn "$policy_arn" || echo "Erreur detachement $policy_arn"
+              fi
+            done
+
+            # Supprimer des instance profiles
+            echo "Suppression des instance profiles..."
+            aws iam list-instance-profiles-for-role --role-name vibe-tickets-ec2-role --query 'InstanceProfiles[].InstanceProfileName' --output text | tr '\t' '\n' | while read profile; do
+              if [ ! -z "$profile" ]; then
+                aws iam remove-role-from-instance-profile --role-name vibe-tickets-ec2-role --instance-profile-name "$profile" || echo "Erreur suppression profile $profile"
+                aws iam delete-instance-profile --instance-profile-name "$profile" || echo "Erreur suppression instance profile $profile"
+              fi
+            done
+
+            # Supprimer le role
+            echo "Suppression du role..."
+            aws iam delete-role --role-name vibe-tickets-ec2-role || echo "Erreur suppression role"
+          else
+            echo "Role IAM n'existe pas"
+          fi
+
+          echo "Nettoyage termine - attente de 10 secondes pour la propagation..."
+          sleep 10
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Déploiement avec Terraform
