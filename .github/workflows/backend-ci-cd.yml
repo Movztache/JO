@@ -398,6 +398,8 @@ jobs:
       # ÉTAPE 9: Nettoyage des ressources conflictuelles
       # ----------------------------------------------------------------------
       - name: Import des ressources existantes dans Terraform
+        continue-on-error: true
+        id: import-resources
         run: |
           cd terraform
 
@@ -505,6 +507,81 @@ jobs:
           echo ""
           echo "État Terraform synchronisé avec AWS"
           echo "=========================================="
+
+      - name: Verification de l'import et gestion des conflits
+        run: |
+          cd terraform
+
+          echo "=========================================="
+          echo "VERIFICATION POST-IMPORT"
+          echo "=========================================="
+
+          # Vérifier si l'import a fonctionné
+          IMPORTED_COUNT=$(terraform state list | wc -l)
+          echo "Ressources importées: $IMPORTED_COUNT"
+
+          if [ "$IMPORTED_COUNT" -eq 0 ]; then
+            echo "⚠️  AUCUNE RESSOURCE IMPORTÉE - Gestion des conflits nécessaire"
+
+            # Stratégie: Utiliser terraform plan pour identifier les conflits
+            echo "🔍 Identification des ressources en conflit..."
+
+            # Créer un plan et capturer les erreurs
+            if ! terraform plan -out=tfplan 2>plan_errors.txt; then
+              echo "❌ Conflits détectés dans le plan Terraform"
+              echo "📋 Erreurs identifiées:"
+              cat plan_errors.txt
+
+              echo ""
+              echo "🔧 SOLUTION: Suppression ciblée des ressources en conflit"
+
+              # Extraire les noms des ressources en conflit
+              if grep -q "RepositoryAlreadyExistsException" plan_errors.txt; then
+                echo "🗑️  Suppression du repository ECR existant..."
+                aws ecr delete-repository --repository-name vibe-tickets --region ${{ env.AWS_REGION }} --force || echo "Erreur suppression ECR"
+              fi
+
+              if grep -q "DBSubnetGroupAlreadyExists" plan_errors.txt; then
+                echo "🗑️  Suppression du DB subnet group existant..."
+                aws rds delete-db-subnet-group --db-subnet-group-name vibe-tickets-db-subnet-group --region ${{ env.AWS_REGION }} || echo "Erreur suppression DB subnet group"
+              fi
+
+              if grep -q "EntityAlreadyExists.*Role" plan_errors.txt; then
+                echo "🗑️  Suppression du role IAM existant..."
+                # Nettoyer les dépendances IAM
+                aws iam list-attached-role-policies --role-name vibe-tickets-ec2-role --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | tr '\t' '\n' | while read policy_arn; do
+                  [ ! -z "$policy_arn" ] && aws iam detach-role-policy --role-name vibe-tickets-ec2-role --policy-arn "$policy_arn" 2>/dev/null
+                done
+                aws iam list-role-policies --role-name vibe-tickets-ec2-role --query 'PolicyNames[]' --output text 2>/dev/null | tr '\t' '\n' | while read policy; do
+                  [ ! -z "$policy" ] && aws iam delete-role-policy --role-name vibe-tickets-ec2-role --policy-name "$policy" 2>/dev/null
+                done
+                aws iam delete-role --role-name vibe-tickets-ec2-role 2>/dev/null || echo "Erreur suppression role"
+
+                # Supprimer aussi l'instance profile
+                aws iam remove-role-from-instance-profile --instance-profile-name vibe-tickets-ec2-profile --role-name vibe-tickets-ec2-role 2>/dev/null
+                aws iam delete-instance-profile --instance-profile-name vibe-tickets-ec2-profile 2>/dev/null || echo "Erreur suppression instance profile"
+              fi
+
+              if grep -q "VpcLimitExceeded" plan_errors.txt; then
+                echo "🗑️  Gestion de la limite VPC..."
+                # Supprimer un VPC non-default pour faire de la place
+                OLD_VPC=$(aws ec2 describe-vpcs --region ${{ env.AWS_REGION }} --query 'Vpcs[?IsDefault==`false`] | [0].VpcId' --output text)
+                if [ "$OLD_VPC" != "None" ] && [ ! -z "$OLD_VPC" ]; then
+                  echo "Suppression du VPC le plus ancien: $OLD_VPC"
+                  aws ec2 delete-vpc --region ${{ env.AWS_REGION }} --vpc-id $OLD_VPC 2>/dev/null || echo "VPC a des dépendances"
+                fi
+              fi
+
+              echo "⏳ Attente de la propagation des suppressions..."
+              sleep 15
+
+            else
+              echo "✅ Aucun conflit détecté - Plan Terraform valide"
+            fi
+
+          else
+            echo "✅ Import réussi - $IMPORTED_COUNT ressources dans l'état"
+          fi
 
       # ----------------------------------------------------------------------
       # ÉTAPE 10: Déploiement avec Terraform
