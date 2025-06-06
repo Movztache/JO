@@ -13,7 +13,7 @@ availability_zones = ["eu-west-3a", "eu-west-3b", "eu-west-3c"]
 
 # EC2
 ec2_instance_type = "t3.small"
-ec2_key_name = "vibe-tickets-key-20250605-110126"
+ec2_key_name = "vibe-tickets-key-20250606-114841"
 my_ip             = "109.209.31.42"  # Votre IP publique
 
 # RDS
@@ -25,7 +25,7 @@ db_password          = "adminco123"
 
 # ECR
 ecr_repository_name = "vibe-tickets"
-image_tag = "v20250605-110126"
+image_tag = "v20250606-114841"
 
 # Frontend
 frontend_url = "http://dkf07zr8j0p2h.cloudfront.net"
