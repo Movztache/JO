@@ -1,5 +1,6 @@
 package com.example.vibetickets.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ public class UserApp {
 
     @ManyToOne
     @JoinColumn(name = "role_id", nullable = true)
+    @JsonIgnoreProperties({"userApps"})
     private Role role;
 
     @OneToMany(mappedBy = "userApp", cascade = CascadeType.ALL, orphanRemoval = true)

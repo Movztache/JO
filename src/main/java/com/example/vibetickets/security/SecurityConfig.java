@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -71,6 +72,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/authentication/**").permitAll()
                         // Routes publiques accessibles sans authentification
                         .requestMatchers("/", "/home", "/offers/**", "/register", "/api/offers/**","/api/cart/**").permitAll()
+                        // Routes publiques pour les actualités (consultation des articles publiés)
+                        .requestMatchers("/api/news/published/**", "/api/news/search/**", "/api/news/author/**").permitAll()
+                        // Consultation d'un article individuel (accessible à tous)
+                        .requestMatchers(HttpMethod.GET, "/api/news/*").permitAll()
                         // Permettre l'accès aux pages d'erreur pour tous les utilisateurs
                         .requestMatchers("/error", "/error/**").permitAll()
                         // Routes nécessitant une authentification
@@ -81,6 +86,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/utilisateurs/**").authenticated()
                         // Routes nécessitant un rôle spécifique
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        // Routes d'administration des actualités (TEMPORAIREMENT OUVERT POUR TEST)
+                        .requestMatchers("/api/news/**").permitAll()
                          .anyRequest().authenticated()
                 )
 
